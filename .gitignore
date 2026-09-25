@@ -1,0 +1,44 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.mypy_cache/
+.pytest_cache/
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+
+# --- Data (large / non-shareable — see data/README.md for how to obtain) ---
+data/raw/*
+data/processed/*
+data/external/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/external/.gitkeep
+
+# --- Model artifacts / results (large binaries) ---
+results/models/*
+!results/models/.gitkeep
+experiments/results/*
+!experiments/results/.gitkeep
+
+# --- Experiment tracking ---
+wandb/
+
+# --- Secrets / environment ---
+.env
+*.env
+.wandb_key
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- IDE ---
+.vscode/
+.idea/

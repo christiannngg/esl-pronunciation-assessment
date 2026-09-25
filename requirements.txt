@@ -1,0 +1,41 @@
+# Core ML / deep learning
+torch==2.4.1
+torchaudio==2.4.1
+transformers==4.44.2
+accelerate==0.34.2
+
+# Classical ML baseline (Sprint 3)
+scikit-learn==1.5.1
+
+# Audio processing / feature extraction
+librosa==0.10.2.post1
+soundfile==0.12.1
+praat-parselmouth==0.4.4   # pitch/prosody features (used in US 3.3)
+
+# Forced alignment (Sprint 2 preprocessing)
+# NOTE: Montreal Forced Aligner is easiest installed via conda (see environment.yml).
+#       If you end up using a pip-only aligner instead, add it here.
+
+# Experiment tracking
+wandb==0.17.9
+
+# Data / utils
+numpy==1.26.4
+pandas==2.2.2
+scipy==1.13.1
+pyyaml==6.0.2
+tqdm==4.66.5
+
+# Notebooks
+jupyter==1.0.0
+ipykernel==6.29.5
+matplotlib==3.9.2
+seaborn==0.13.2
+
+# Testing
+pytest==8.3.2
+pytest-cov==5.0.0
+
+# Web app (Sprint 9 — install later, listed here for completeness)
+fastapi==0.114.0
+uvicorn==0.30.6
