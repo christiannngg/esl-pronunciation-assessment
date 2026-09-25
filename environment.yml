@@ -6,37 +6,28 @@ channels:
 dependencies:
   - python=3.10
   - pip
-  - ffmpeg              # required by librosa/soundfile for many audio codecs
-  - montreal-forced-aligner=2.2.17   # phoneme/word alignment, used in US 2.2 — conda-forge only, not on pip
+  - ffmpeg
+  - montreal-forced-aligner
   - pip:
-      - torch==2.4.1
-      - torchaudio==2.4.1
-      - transformers==4.44.2
-      - accelerate==0.34.2
-      - scikit-learn==1.5.1
-      - librosa==0.10.2.post1
-      - soundfile==0.12.1
-      - praat-parselmouth==0.4.4
-      - wandb==0.17.9
-      - numpy==1.26.4
-      - pandas==2.2.2
-      - scipy==1.13.1
-      - pyyaml==6.0.2
-      - tqdm==4.66.5
-      - jupyter==1.0.0
-      - ipykernel==6.29.5
-      - matplotlib==3.9.2
+      - torch==2.14.0
+      - torchaudio==2.11.0
+      - transformers==5.17.0
+      - accelerate==1.15.0
+      - scikit-learn==1.7.2
+      - librosa==0.11.0
+      - soundfile==0.14.0
+      - praat-parselmouth==0.4.7
+      - wandb==0.30.0
+      - numpy==2.2.6
+      - pandas==2.3.3
+      - scipy==1.15.3
+      - pyyaml==6.0.3
+      - tqdm==4.70.1
+      - jupyter==1.1.1
+      - ipykernel==7.3.0
+      - matplotlib==3.10.9
       - seaborn==0.13.2
-      - pytest==8.3.2
-      - pytest-cov==5.0.0
-      - fastapi==0.114.0
-      - uvicorn==0.30.6
-
-# Notes:
-# - On the school cluster, PyTorch's CUDA build may need to be selected manually
-#   depending on the installed CUDA driver version. If `torch.cuda.is_available()`
-#   returns False after `conda env create`, reinstall torch with the matching
-#   CUDA wheel, e.g.:
-#     pip install torch==2.4.1 --index-url https://download.pytorch.org/whl/cu121
-# - Montreal Forced Aligner pulls in its own Kaldi binaries via conda-forge;
-#   this is why it's listed as a conda dep rather than a pip dep.
+      - pytest==9.1.1
+      - pytest-cov==7.1.0
+      - fastapi==0.141.1
+      - uvicorn==0.54.0

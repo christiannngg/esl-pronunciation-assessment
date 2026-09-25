@@ -6,6 +6,7 @@ a fine-tuned multi-task deep learning model for automated, multi-level ESL
 pronunciation assessment — plus a demo web app.
 
 **Research questions:**
+
 1. Do pretrained deep speech representations improve multi-level ESL
    pronunciation assessment compared with traditional acoustic-feature
    approaches?
@@ -21,7 +22,7 @@ See `data/README.md` for acquisition and licensing details.
 
 ## Repository Structure
 
-```
+```txt
 esl-pronunciation-assessment/
 ├── data/                # raw/ processed/ external/ — see data/README.md
 ├── src/                 # data/ models/ experiments/ evaluation/ visualization/ utils/
@@ -67,9 +68,29 @@ conda activate esl-pronunciation
 If `torch.cuda.is_available()` is `False` after installing, your CUDA driver
 version likely doesn't match the default PyTorch build. Reinstall with the
 matching wheel, e.g.:
+
 ```bash
-pip install torch==2.4.1 --index-url https://download.pytorch.org/whl/cu121
+pip install torch==2.14.0 --index-url https://download.pytorch.org/whl/cu121
 ```
+
+### macOS note — OpenMP crash
+
+On macOS with conda, you may see:
+
+```txt
+OMP: Error #15: Initializing libomp.dylib, but found libomp.dylib already initialized.
+```
+
+This happens because conda-forge packages (numpy, scikit-learn) and the
+`torch` pip wheel each bundle their own OpenMP runtime. Fix:
+
+```bash
+conda env config vars set KMP_DUPLICATE_LIB_OK=TRUE
+conda deactivate && conda activate esl-pronunciation
+```
+
+This only appears to affect the local macOS/conda setup — not expected on
+Colab or the school cluster, but re-check there too.
 
 ---
 
@@ -80,11 +101,14 @@ land in one shared dashboard.
 
 1. Create a free account at [wandb.ai](https://wandb.ai) if you don't have one.
 2. On **each machine**, run once:
+
    ```bash
    wandb login
    ```
+
 3. Use the shared helper in `src/utils/tracking.py` to start runs — it
    auto-tags which environment a run came from:
+
    ```python
    from src.utils.tracking import init_run
 
