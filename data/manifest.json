@@ -1,0 +1,228 @@
+{
+  "speechocean762": {
+    "available": true,
+    "license": "CC BY 4.0",
+    "total_utterances": 5000,
+    "total_speakers": 250,
+    "train_utterances": 2500,
+    "test_utterances": 2500,
+    "gender_counts": {
+      "m": 125,
+      "f": 125
+    },
+    "age_distribution_sample": {
+      "37": 3,
+      "31": 2,
+      "30": 4,
+      "7": 22,
+      "26": 5,
+      "25": 9,
+      "24": 6,
+      "21": 27,
+      "6": 25,
+      "20": 26,
+      "8": 8,
+      "22": 9,
+      "9": 19,
+      "19": 10,
+      "10": 6,
+      "12": 11,
+      "11": 13,
+      "13": 3,
+      "15": 13,
+      "28": 6,
+      "27": 2,
+      "33": 3,
+      "29": 4,
+      "32": 2,
+      "23": 6,
+      "35": 2,
+      "38": 1,
+      "43": 1,
+      "14": 2
+    },
+    "annotation_levels": [
+      "sentence",
+      "word",
+      "phoneme"
+    ],
+    "score_fields": [
+      "accuracy",
+      "completeness",
+      "fluency",
+      "prosodic",
+      "total"
+    ]
+  },
+  "l2arctic": {
+    "available": true,
+    "license": "CC BY-NC 4.0 (non-commercial use only)",
+    "total_speakers": 24,
+    "total_wav_files": 26867,
+    "total_manual_annotations": 3599,
+    "utterances_by_l1_background": {
+      "Arabic": 4365,
+      "Mandarin": 4524,
+      "Hindi": 4524,
+      "Korean": 4524,
+      "Spanish": 4402,
+      "Vietnamese": 4528
+    },
+    "utterances_by_gender": {
+      "M": 13447,
+      "F": 13420
+    },
+    "per_speaker": {
+      "ABA": {
+        "l1": "Arabic",
+        "gender": "M",
+        "n_wav": 1129,
+        "n_annotations": 150
+      },
+      "SKA": {
+        "l1": "Arabic",
+        "gender": "F",
+        "n_wav": 974,
+        "n_annotations": 150
+      },
+      "YBAA": {
+        "l1": "Arabic",
+        "gender": "M",
+        "n_wav": 1130,
+        "n_annotations": 149
+      },
+      "ZHAA": {
+        "l1": "Arabic",
+        "gender": "F",
+        "n_wav": 1132,
+        "n_annotations": 150
+      },
+      "BWC": {
+        "l1": "Mandarin",
+        "gender": "M",
+        "n_wav": 1130,
+        "n_annotations": 150
+      },
+      "LXC": {
+        "l1": "Mandarin",
+        "gender": "F",
+        "n_wav": 1131,
+        "n_annotations": 150
+      },
+      "NCC": {
+        "l1": "Mandarin",
+        "gender": "F",
+        "n_wav": 1131,
+        "n_annotations": 150
+      },
+      "TXHC": {
+        "l1": "Mandarin",
+        "gender": "M",
+        "n_wav": 1132,
+        "n_annotations": 150
+      },
+      "ASI": {
+        "l1": "Hindi",
+        "gender": "M",
+        "n_wav": 1131,
+        "n_annotations": 150
+      },
+      "RRBI": {
+        "l1": "Hindi",
+        "gender": "M",
+        "n_wav": 1130,
+        "n_annotations": 150
+      },
+      "SVBI": {
+        "l1": "Hindi",
+        "gender": "F",
+        "n_wav": 1132,
+        "n_annotations": 150
+      },
+      "TNI": {
+        "l1": "Hindi",
+        "gender": "F",
+        "n_wav": 1131,
+        "n_annotations": 150
+      },
+      "HJK": {
+        "l1": "Korean",
+        "gender": "F",
+        "n_wav": 1131,
+        "n_annotations": 150
+      },
+      "HKK": {
+        "l1": "Korean",
+        "gender": "M",
+        "n_wav": 1131,
+        "n_annotations": 150
+      },
+      "YDCK": {
+        "l1": "Korean",
+        "gender": "F",
+        "n_wav": 1131,
+        "n_annotations": 150
+      },
+      "YKWK": {
+        "l1": "Korean",
+        "gender": "M",
+        "n_wav": 1131,
+        "n_annotations": 150
+      },
+      "EBVS": {
+        "l1": "Spanish",
+        "gender": "M",
+        "n_wav": 1007,
+        "n_annotations": 150
+      },
+      "ERMS": {
+        "l1": "Spanish",
+        "gender": "M",
+        "n_wav": 1132,
+        "n_annotations": 150
+      },
+      "MBMPS": {
+        "l1": "Spanish",
+        "gender": "F",
+        "n_wav": 1132,
+        "n_annotations": 150
+      },
+      "NJS": {
+        "l1": "Spanish",
+        "gender": "F",
+        "n_wav": 1131,
+        "n_annotations": 150
+      },
+      "HQTV": {
+        "l1": "Vietnamese",
+        "gender": "M",
+        "n_wav": 1132,
+        "n_annotations": 150
+      },
+      "PNV": {
+        "l1": "Vietnamese",
+        "gender": "F",
+        "n_wav": 1132,
+        "n_annotations": 150
+      },
+      "THV": {
+        "l1": "Vietnamese",
+        "gender": "F",
+        "n_wav": 1132,
+        "n_annotations": 150
+      },
+      "TLV": {
+        "l1": "Vietnamese",
+        "gender": "M",
+        "n_wav": 1132,
+        "n_annotations": 150
+      }
+    },
+    "error_types_annotated": [
+      "substitution",
+      "deletion",
+      "addition"
+    ],
+    "has_suitcase_corpus": true
+  }
+}
