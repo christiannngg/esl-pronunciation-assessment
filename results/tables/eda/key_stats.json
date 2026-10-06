@@ -1,0 +1,217 @@
+{
+  "so762": {
+    "utterances": 5000,
+    "speakers": 250,
+    "words": 31816,
+    "phone_tokens": 94445,
+    "train_utts": 2500,
+    "test_utts": 2500,
+    "train_speakers": 125,
+    "test_speakers": 125,
+    "speakers_in_both_splits": 0,
+    "utts_per_speaker_min": 20,
+    "utts_per_speaker_max": 20,
+    "child_speakers": 122,
+    "adult_speakers": 128,
+    "hours": 5.57,
+    "sample_rates": {
+      "16000": 5000
+    },
+    "dur_min_s": 1.59,
+    "dur_max_s": 20.408,
+    "dur_median_s": 3.5255,
+    "unique_prompts": 4947,
+    "prompts_shared_across_splits": 52,
+    "test_utts_prompt_seen_in_train": 52,
+    "share_word_stress_wrong": 0.00902061855670103,
+    "share_word_acc10": 0.8882009052049283,
+    "share_word_acc_le6": 0.0896090017601207,
+    "expert_phone_label_share": {
+      "0": 0.05822012811689343,
+      "1": 0.021167875483085394,
+      "2": 0.9206119964000212
+    },
+    "phone_share_lt05": 0.03603155275557202,
+    "phone_share_lt10": 0.048091481814812855,
+    "phone_share_lt15": 0.07655249086770077,
+    "phone_share_lt20": 0.19316004023505745,
+    "phone_share_eq20": 0.8068399597649426,
+    "n_base_phones": 39,
+    "phone_tokens_with_pronounced_label": 3403,
+    "agreement": {
+      "sentence_accuracy": {
+        "pairwise_r": 0.6609,
+        "leave_one_out_r": 0.7658,
+        "icc_2_1": 0.6048,
+        "icc_1_1": 0.5988,
+        "mean_pairwise_QWK": 0.6052
+      },
+      "sentence_fluency": {
+        "pairwise_r": 0.6903,
+        "leave_one_out_r": 0.7878,
+        "icc_2_1": 0.5138,
+        "icc_1_1": 0.4884,
+        "mean_pairwise_QWK": 0.5381
+      },
+      "sentence_prosodic": {
+        "pairwise_r": 0.6686,
+        "leave_one_out_r": 0.7718,
+        "icc_2_1": 0.5125,
+        "icc_1_1": 0.4893,
+        "mean_pairwise_QWK": 0.5306
+      },
+      "sentence_total": {
+        "pairwise_r": 0.7083,
+        "leave_one_out_r": 0.8019,
+        "icc_2_1": 0.6346,
+        "icc_1_1": 0.6273
+      },
+      "word_accuracy": {
+        "pairwise_r": 0.6235,
+        "leave_one_out_r": 0.7347,
+        "icc_2_1": 0.6016,
+        "icc_1_1": 0.5997,
+        "mean_pairwise_QWK": 0.6084
+      },
+      "word_stress": {
+        "pairwise_r": 0.1918,
+        "leave_one_out_r": 0.2839,
+        "icc_2_1": 0.1285,
+        "icc_1_1": 0.1141,
+        "mean_pairwise_QWK": 0.1483
+      },
+      "word_total": {
+        "pairwise_r": 0.6361,
+        "leave_one_out_r": 0.7452,
+        "icc_2_1": 0.6191,
+        "icc_1_1": 0.6177
+      },
+      "phone_score (0/1/2)": {
+        "fleiss_kappa": 0.4639,
+        "pairwise_exact_agreement": 0.9203
+      }
+    },
+    "phone_majority_wrong_share": 0.04753030864524326,
+    "phone_non_unanimous_share": 0.1689131240404468,
+    "speaker_level_split_shift": {
+      "all speakers": {
+        "mean_train": 7.181,
+        "mean_test": 7.263,
+        "p": 0.9735
+      },
+      "adult": {
+        "mean_train": 6.716,
+        "mean_test": 7.04,
+        "p": 0.2621
+      },
+      "child/teen": {
+        "mean_train": 7.718,
+        "mean_test": 7.476,
+        "p": 0.2711
+      }
+    },
+    "between_speaker_variance_share": {
+      "accuracy": 0.7007,
+      "fluency": 0.7609,
+      "prosodic": 0.7769,
+      "total": 0.734
+    }
+  },
+  "l2arctic": {
+    "speakers": 24,
+    "scripted_wavs": 26867,
+    "hours": 27.07,
+    "mean_utt_s": 3.628,
+    "suitcase_narratives": 22,
+    "speakers_per_l1": {
+      "Arabic": 4,
+      "Hindi": 4,
+      "Korean": 4,
+      "Mandarin": 4,
+      "Spanish": 4,
+      "Vietnamese": 4
+    },
+    "wavs_per_speaker_min": 974,
+    "wavs_per_speaker_max": 1132,
+    "sample_rates": {
+      "44100": 26889
+    },
+    "annotated_scripted_utts": 3599,
+    "annotated_suitcase_files": 22,
+    "annotated_share_of_scripted": 0.13395615439014405,
+    "distinct_annotated_prompts": 300,
+    "annotated_prompts_shared_by_all_speakers": 99,
+    "annotated_prompts_single_l1": 119,
+    "annotated_prompts_all_l1": 100,
+    "distinct_scripted_prompts": 1132,
+    "label_sanity": {
+      "intervals": 146976,
+      "error_tagged": 20829,
+      "tagged_with_whitespace": 9105,
+      "malformed": 0,
+      "empty_intervals": 3675,
+      "nonpositive_duration": 0,
+      "speech_phones_lt_20ms": 194,
+      "canonical_outside_arpabet": [
+        "AX",
+        "D_",
+        "ER)",
+        "V``",
+        "W`",
+        "Y_",
+        "Z_"
+      ],
+      "canonical_typo_tokens": 6,
+      "tagged_uppercase": 182
+    },
+    "error_counts_scripted": {
+      "substitution": 14098,
+      "deletion": 3420,
+      "addition": 1092
+    },
+    "error_counts_suitcase": {
+      "substitution": 1673,
+      "deletion": 456,
+      "addition": 90
+    },
+    "canonical_phones_scripted": 119151,
+    "error_rate_by_l1": {
+      "Arabic": 9.755,
+      "Hindi": 13.994,
+      "Korean": 9.418,
+      "Mandarin": 15.361,
+      "Spanish": 16.035,
+      "Vietnamese": 23.446
+    },
+    "speaker_error_rate_min": 6.789,
+    "speaker_error_rate_max": 26.481,
+    "sub_tagged_err": 262,
+    "sub_tagged_deviation": 1744,
+    "annotated_utts_clean_share": 0.03612114476243401,
+    "annotated_words": 34000,
+    "word_error_share": 0.4157058823529412,
+    "phones_lt50_errors": 2,
+    "phones_lt100_errors": 9,
+    "n_canonical_phonemes": 39,
+    "phones_lt50_errors_list": [
+      "M",
+      "OY"
+    ],
+    "top5_error_phonemes": [
+      "Z",
+      "DH",
+      "R",
+      "D",
+      "AH"
+    ],
+    "top5_error_share": 0.426271621853057,
+    "phone_correct_share": 0.845230075763246
+  },
+  "cross": {
+    "so762_base_phones": 39,
+    "l2_base_phones": 46,
+    "l2_nonstandard_labels": 7,
+    "difficulty_spearman_rho": 0.497,
+    "difficulty_phonemes_compared": 36
+  }
+}
