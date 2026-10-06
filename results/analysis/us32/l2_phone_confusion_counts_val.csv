@@ -1,0 +1,5 @@
+,pred_correct,pred_substitution,pred_deletion,pred_addition
+true_correct,98699,2716,218,0
+true_substitution,11262,2804,32,0
+true_deletion,3100,139,181,0
+true_addition,1061,28,3,0

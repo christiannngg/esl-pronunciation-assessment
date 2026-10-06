@@ -1,0 +1,3 @@
+test,rho,p,n_phonemes
+"spearman(recall, train_error_support)",0.5959378040789081,6.257893388752858e-05,39
+"spearman(recall, train_error_rate)",0.9175324017004377,2.1488064622040976e-16,39

@@ -1,0 +1,32 @@
+# Sprint 3 traditional-ML baselines (read by src/models/baselines.py)
+seed: 42
+bootstrap: {n_boot: 500, seed: 0}
+phone_binarize_threshold: 1.0        # "mispronounced" = phone score < 1.0 (agreed); 0.5 / 1.5 are sensitivity checks
+sensitivity_thresholds: [0.5, 1.5]
+sensitivity_models: [logreg, rf]     # keeps the sensitivity runs cheap
+kernel_max_train: 10000              # RBF SVR / SVC are O(n^2): fit on a seeded random subsample of this many rows
+rf: {n_estimators: 150, max_features: sqrt}
+grids:                               # tuned on VALIDATION only; selection metric: val MAE (reg), val balanced accuracy (clf)
+  reg:
+    ridge: {alpha: [1, 10, 100, 1000]}
+    svr: {C: [1, 10]}
+    rf: {min_samples_leaf: [3, 10]}
+  clf:
+    logreg: {C: [0.01, 0.1, 1]}
+    svm: {C: [1, 10]}
+    rf: {min_samples_leaf: [2, 5]}
+l2arctic_window_half_s: 0.075        # fixed analysis window half-width around each unit midpoint (see src/features/aggregate.py)
+
+# US 3.3 variants. Each variant re-fits the SAME hyper-parameters US 3.1 selected on validation (so the delta isolates the fix).
+variant_models: {reg: [ridge, rf, svr], clf: [logreg, rf, svm]}
+variant_skip: {l2_phone_error: [svm]}        # RBF-SVM predictions on 60k rows per fold are too slow for every variant
+resample_bins:                               # score bins used to flatten the target distribution (regression resampling)
+  word_accuracy: [-1, 4, 6, 8, 9, 10]
+  phone_score: [-0.01, 0.5, 1.0, 1.5, 1.99, 2.01]
+variants:
+  us31: {}
+  cw: {kinds: [clf], class_weight: balanced}
+  rs: {kinds: [reg], tasks: [word_accuracy, phone_score], resample_power: 0.5}
+  pros: {extra: pros}
+  cw_pros: {kinds: [clf], class_weight: balanced, extra: pros}
+  rs_pros: {kinds: [reg], tasks: [word_accuracy, phone_score], resample_power: 0.5, extra: pros}

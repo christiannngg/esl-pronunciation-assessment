@@ -6,13 +6,13 @@ Loaders and helpers: `src/data/loaders.py`, `src/data/eda_utils.py` (parser test
 
 ## 1. Dataset structure
 
-| | SpeechOcean762 | L2-ARCTIC |
-|---|---|---|
-| Speakers | 250 (125 train / 125 test, no overlap, 20 utterances each) | 24 (4 per L1: Arabic, Hindi, Korean, Mandarin, Spanish, Vietnamese; 2 F + 2 M each) |
-| L1 | all Mandarin | 6 L1s |
-| Age | 122 child/teen (6-15) + 128 adult (19-43) | adults |
-| Audio | 5,000 utterances, 5.6 h, 16 kHz | 26,867 scripted wavs, 27.1 h, 44.1 kHz, plus 22 spontaneous "suitcase" narratives (26 min) |
-| Labels | sentence (accuracy, fluency, prosodic, completeness, total), word (accuracy, stress, total), phoneme (0-2), 5 experts | phone-level error tags (substitution / deletion / addition) on **3,599 scripted utterances (13.4%)** + 22 suitcase files; forced alignment for every scripted file; **no sentence or word scores** |
+| SpeechOcean762 | L2-ARCTIC                                                  |
+|----------------|------------------------------------------------------------|-------------------------------------------------------------------------------------|
+| Speakers       | 250 (125 train / 125 test, no overlap, 20 utterances each) | 24 (4 per L1: Arabic, Hindi, Korean, Mandarin, Spanish, Vietnamese; 2 F + 2 M each) |
+| L1             | all Mandarin                                               | 6 L1s |
+| Age            | 122 child/teen (6-15) + 128 adult (19-43)                  | adults |
+| Audio          | 5,000 utterances, 5.6 h, 16 kHz                            | 26,867 scripted wavs, 27.1 h, 44.1 kHz, plus 22 spontaneous "suitcase" narratives (26 min) |
+| Labels         | sentence (accuracy, fluency, prosodic, completeness, total), word (accuracy, stress, total), phoneme (0-2), 5 experts | phone-level error tags (substitution / deletion / addition) on **3,599 scripted utterances (13.4%)** + 22 suitcase files; forced alignment for every scripted file; **no sentence or word scores** |
 
 L2-ARCTIC totals reproduce the README exactly (scripted 14,098 S / 3,420 D / 1,092 A; suitcase 1,673 / 456 / 90). Headline numbers were also recomputed independently from the raw files and matched.
 
