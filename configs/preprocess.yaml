@@ -1,0 +1,7 @@
+# US 2.2 preprocessing settings (read by src/preprocessing/pipeline.py)
+seed: 42                       # split seed (recorded in data/splits/splits_metadata.json)
+so762_val_frac: 0.15           # share of train speakers held out for validation
+l2arctic_annotated_only: true  # process only the 3,600 manually annotated utterances
+mfa_beam: 100                  # wide beam: mispronounced / child speech aligns poorly at the default 10
+mfa_retry_beam: 400
+mfa_jobs: 4

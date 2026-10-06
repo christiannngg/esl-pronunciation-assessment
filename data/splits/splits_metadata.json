@@ -1,0 +1,98 @@
+{
+  "seed": 42,
+  "so762": {
+    "disjoint": true,
+    "all_speakers_covered": true,
+    "test_equals_official_test": true,
+    "n_speakers": {
+      "train": 106,
+      "val": 19,
+      "test": 125
+    },
+    "n_utterances": {
+      "test": 2500,
+      "train": 2120,
+      "val": 380
+    },
+    "strata_counts": {
+      "train": {
+        "adult|f": 35,
+        "adult|m": 22,
+        "child/teen|f": 22,
+        "child/teen|m": 27
+      },
+      "val": {
+        "adult|f": 6,
+        "adult|m": 4,
+        "child/teen|f": 4,
+        "child/teen|m": 5
+      },
+      "test": {
+        "adult|f": 31,
+        "adult|m": 30,
+        "child/teen|f": 27,
+        "child/teen|m": 37
+      }
+    },
+    "mean_scores": {
+      "train": {
+        "accuracy": 7.623,
+        "fluency": 7.74,
+        "prosodic": 7.424,
+        "total": 7.183
+      },
+      "val": {
+        "accuracy": 7.595,
+        "fluency": 7.666,
+        "prosodic": 7.416,
+        "total": 7.174
+      },
+      "test": {
+        "accuracy": 7.696,
+        "fluency": 7.84,
+        "prosodic": 7.502,
+        "total": 7.263
+      }
+    },
+    "ks_val_vs_train": {
+      "accuracy": 0.031,
+      "fluency": 0.04,
+      "prosodic": 0.038,
+      "total": 0.022
+    },
+    "val_max_ks_selected": 0.04021847070506455,
+    "sha256_16": "044533ef12a2cd44"
+  },
+  "l2arctic": {
+    "every_speaker_once": true,
+    "n_speakers": 24,
+    "folds": {
+      "0": {
+        "n": 6,
+        "F": 3,
+        "M": 3,
+        "l1_each_once": true
+      },
+      "1": {
+        "n": 6,
+        "F": 3,
+        "M": 3,
+        "l1_each_once": true
+      },
+      "2": {
+        "n": 6,
+        "F": 3,
+        "M": 3,
+        "l1_each_once": true
+      },
+      "3": {
+        "n": 6,
+        "F": 3,
+        "M": 3,
+        "l1_each_once": true
+      }
+    },
+    "all_checks_pass": true,
+    "sha256_16": "e95661a6bcbb61d3"
+  }
+}

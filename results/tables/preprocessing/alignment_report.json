@@ -1,0 +1,63 @@
+{
+  "so762": {
+    "status_counts": {
+      "ok": 5000
+    },
+    "usable_fraction": 1.0,
+    "rejection_reasons": {},
+    "ok_rate_by_age_group": {
+      "adult": 1.0,
+      "child/teen": 1.0
+    },
+    "ok_rate_by_total_band": {
+      "0-4": 1.0,
+      "5-6": 1.0,
+      "7-8": 1.0,
+      "9-10": 1.0
+    },
+    "phone_duration_ms": {
+      "median": 109.99999999999987,
+      "share_le_30ms": 0.031595108264069034,
+      "share_gt_500ms": 0.015331674519561649,
+      "n_phones": 94445
+    }
+  },
+  "l2arctic_labels": {
+    "n_phone_rows": 146976,
+    "n_label_repaired": 376,
+    "n_unmapped": 0,
+    "error_class_counts": {
+      "correct": 109328,
+      "silence": 16819,
+      "substitution": 15771,
+      "deletion": 3876,
+      "addition": 1182
+    }
+  },
+  "l2arctic_annotation_vs_provided_fa": {
+    "n_utts_same_phone_count": 3380,
+    "n_utts_different_phone_count": 219,
+    "median_abs_start_shift_ms": 0.0,
+    "share_unchanged_within_1ms": 0.8981935391190361,
+    "p90_abs_start_shift_ms": 8.40536318018769
+  },
+  "l2arctic_mfa_vs_provided_fa": {
+    "n_utts_compared": 1796,
+    "n_utts_phone_sequence_mismatch": 1803,
+    "n_utts_missing": 0,
+    "n_phones": 55723,
+    "median_abs_start_diff_ms": 10.000000000000009,
+    "p90_abs_start_diff_ms": 30.000000000000007,
+    "share_within_20ms": 0.768551585521239,
+    "share_within_50ms": 0.9636415842650252
+  },
+  "l2arctic_mfa_vs_provided_fa_words": {
+    "n_utts_compared": 3575,
+    "n_utts_word_sequence_mismatch": 24,
+    "n_boundaries": 67460,
+    "median_abs_diff_ms": 10.000000000000009,
+    "p90_abs_diff_ms": 40.000000000000036,
+    "share_within_20ms": 0.608656981915209,
+    "share_within_50ms": 0.918040320189742
+  }
+}

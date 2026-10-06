@@ -39,7 +39,7 @@ L2-ARCTIC totals reproduce the README exactly (scripted 14,098 S / 3,420 D / 1,0
 - **Only 24 L2-ARCTIC speakers**: a fixed speaker-held-out test set of a few speakers is high-variance.
 - **Prompt text is shared across speakers** (99 of the 300 annotated L2-ARCTIC prompts are annotated for all 24 speakers; 119 are annotated only for one L1's 4 speakers). Text cannot be disjoint under a speaker split. In SpeechOcean762 only 52 test utterances (2.1%) reuse a train prompt.
 - **Annotation tag noise in L2-ARCTIC**: 9,105 of 20,829 error tags contain stray whitespace, 182 use upper-case s/d/a, 6 canonical labels are typos (`D_`, `ER)`, `V``, `W``, `Y_`, `Z_`), 3,675 phone intervals are empty. `parse_phone_label` normalises these.
-- **Policy decisions needed for tags**: 1,744 substitutions carry `*` (accented variant, 11.1%) and 262 are tagged `err`.
+- **Policy decisions needed for tags**: 1,744 substitutions carry `*` (accented variant, 11.1%; 1,471 or 10.4% of scripted substitutions, concentrated in Arabic and Hindi speakers) and 262 are tagged `err`.
 - **Train/test shift in SpeechOcean762 is small**: speaker-level differences by age group are not significant (adult p = 0.26, child/teen p = 0.27), but report child/teen and adult results separately because the groups differ in prompt length, speaking rate and score spread.
 - **Different label schemes**: SpeechOcean762 has scores and L2-ARCTIC has error types, so they cannot share a joint label set. Phoneme difficulty for Mandarin speakers is only moderately correlated across the datasets (Spearman 0.50 over 36 phonemes).
 - **Audio**: SpeechOcean762 is 16 kHz; L2-ARCTIC is 44.1 kHz and needs resampling. One SpeechOcean762 clip is 20.4 s (longest test clip 12.2 s).
@@ -48,9 +48,9 @@ L2-ARCTIC totals reproduce the README exactly (scripted 14,098 S / 3,420 D / 1,0
 
 1. **SpeechOcean762**: keep the official test set unchanged. Build validation from train speakers only (about 19 speakers), stratified by age group × gender × speaker-mean score.
 2. **L2-ARCTIC**: speaker-grouped folds stratified by L1 and gender instead of one tiny hold-out; supervised error-type work uses the annotated subset only; suitcase files are excluded from training and validation.
-3. **Targets**: viable regression targets are sentence accuracy / fluency / prosodic / total and word accuracy (SpeechOcean762), plus phone score. Viable classification targets are L2-ARCTIC phone error type and derived word-level "has error". Drop or demote completeness and word stress; avoid utterance-level "has error".
+3. **Targets**: viable regression targets are sentence accuracy / fluency / prosodic / total and word accuracy (SpeechOcean762), plus phone score. Viable classification targets are L2-ARCTIC phone error type and derived word-level "has error". Leave completeness and word stress out of the modeling targets (they are not among the six proposed heads); avoid utterance-level "has error".
 4. **Imbalance handling** (class weights or resampling) happens inside training splits only. Report macro-F1 / balanced accuracy with per-class support.
 5. **Reporting rules for Sprint 3 onward**: per age group, per L1, and relative to the human-agreement ceiling.
 6. **Preprocessing decisions for US 2.2**: `*`/`err` tag policy, typo-label mapping, a common 39-phone inventory, resampling to 16 kHz, attachment rule for addition intervals that fall between words.
 
-Open question for the Sprint 7 scope review: completeness and word stress are weak candidates for the six prediction heads.
+Scope note: the proposal's six heads are overall pronunciation, fluency, prosody, word-level accuracy, phoneme correctness and error type. Completeness and word stress are not among them, so leaving them out of modeling needs no scope change (the columns stay in the manifests). The head to watch at the Sprint 7 scope review is error type, which only L2-ARCTIC supports.
