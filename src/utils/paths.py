@@ -5,16 +5,16 @@ school GPU cluster). Both datasets live in one Google Drive folder:
     MyDrive/esl-pronunciation-data/raw/speechocean762/
     MyDrive/esl-pronunciation-data/raw/l2arctic_release_v5.0/
 
-On Colab, this mounts Drive automatically. On your local Mac (or the
-school cluster, if it can reach Drive), set the DATA_ROOT environment
-variable to wherever that Drive folder is synced locally, e.g. in your
-shell profile:
+Resolution order:
+  1. The DATA_ROOT environment variable, if set (any environment). Sprint 4 uses this on Colab to point at a
+     local copy of the processed data unpacked from the Colab pack (fast local disk instead of Drive).
+  2. On Colab without DATA_ROOT: this mounts Drive and uses MyDrive/esl-pronunciation-data.
+  3. Otherwise the repo-local ./data directory (useful for quick local-only testing).
+
+On your local Mac (or the school cluster, if it can reach Drive), set DATA_ROOT to wherever that Drive folder is
+synced locally, e.g. in your shell profile:
 
     export DATA_ROOT="/Users/chirstiangonzalez/Google Drive/My Drive/esl-pronunciation-data"
-
-If DATA_ROOT isn't set and we're not on Colab, this falls back to the
-repo-local ./data directory (useful for quick local-only testing with
-a small sample, but NOT where the full datasets should live long-term).
 """
 
 import os
@@ -30,6 +30,10 @@ def get_data_root() -> Path:
     Returns the root Path containing raw/ (and later processed/, external/)
     for both datasets, resolved appropriately for the current environment.
     """
+    env_root = os.environ.get("DATA_ROOT")
+    if env_root:
+        return Path(env_root)
+
     if _is_colab():
         drive_mount = Path("/content/drive")
         if not (drive_mount / "MyDrive").exists():
@@ -37,10 +41,6 @@ def get_data_root() -> Path:
 
             drive.mount(str(drive_mount))
         return drive_mount / "MyDrive" / "esl-pronunciation-data"
-
-    env_root = os.environ.get("DATA_ROOT")
-    if env_root:
-        return Path(env_root)
 
     # Fallback: repo-local data/ (gitignored). Fine for quick local checks,
     # but set DATA_ROOT to your synced Drive folder for the real datasets.

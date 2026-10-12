@@ -1,0 +1,22 @@
+# Sprint 4 frozen-encoder settings (read by src/features/ssl_embeddings.py)
+seed: 42
+
+# Pretrain-only base checkpoints (same size, so the comparison is clean). Larger / ASR-finetuned checkpoints are US 4.3 candidates.
+# `revision: null` uses the hub's default branch; the resolved commit hash is written to each cache's manifest.json.
+encoders:
+  wav2vec2_base:   {hf_id: facebook/wav2vec2-base,    revision: null}
+  hubert_base:     {hf_id: facebook/hubert-base-ls960, revision: null}
+  wavlm_base_plus: {hf_id: microsoft/wavlm-base-plus,  revision: null}
+
+extraction:
+  device: auto              # auto -> cuda, then mps, then cpu
+  cache_dtype: float16      # pooled vectors are stored as fp16 (about 6 GB per base encoder, all 13 layers)
+  shard_size: 250           # utterances per resume checkpoint
+  # cache_root: null        # default <data_root>/processed/features/ssl ; override with --cache-root or $SSL_CACHE_ROOT
+
+# Units are exactly the Sprint 3 rows (same order as data/processed/features/tables/<unit>_meta.csv.gz):
+#   *_sentence  mean||std over all frames of the file           -> (n, layers, 2*dim)
+#   *_word      mean over the word's aligned frames              -> (n, layers, dim)
+#   so762_phone mean over the MFA phone interval                 -> (n, layers, dim)
+#   l2_phone    mean over the FIXED window around the annotated unit midpoint (half-width = baseline.yaml l2arctic_window_half_s)
+units: [so762_sentence, so762_word, so762_phone, l2_word, l2_phone]
