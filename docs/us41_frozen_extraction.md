@@ -10,13 +10,13 @@ For each encoder (`wav2vec2_base` = facebook/wav2vec2-base, `hubert_base` = face
 `<cache_root>/<encoder>/` with a float16 array per Sprint 3 unit and **all 13 hidden states** (index 0 = encoder input after
 the conv front end, 1..12 = transformer layers):
 
-| file | shape | pooling |
-|---|---|---|
-| `so762_sentence_X.npy` | (5000, 13, 1536) | mean ‖ std over every frame of the file |
-| `so762_word_X.npy` | (31816, 13, 768) | mean over the MFA word interval |
-| `so762_phone_X.npy` | (94445, 13, 768) | mean over the MFA phone interval |
-| `l2_word_X.npy` | (33985, 13, 768) | mean over the span of the word's non-addition units |
-| `l2_phone_X.npy` | (120243, 13, 768) | mean over the fixed ±0.075 s window around the annotated unit midpoint |
+| file                   | shape             | pooling                                                                |
+|------------------------|-------------------|------------------------------------------------------------------------|
+| `so762_sentence_X.npy` | (5000, 13, 1536)  | mean ‖ std over every frame of the file                                |
+| `so762_word_X.npy`.    | (31816, 13, 768)  | mean over the MFA word interval                                        |
+| `so762_phone_X.npy`    | (94445, 13, 768)  | mean over the MFA phone interval                                       |
+| `l2_word_X.npy`        | (33985, 13, 768)  | mean over the span of the word's non-addition units                    |
+| `l2_phone_X.npy`       | (120243, 13, 768) | mean over the fixed ±0.075 s window around the annotated unit midpoint |
 
 Roughly 6 GB per encoder. `manifest.json` records the model id and resolved hub commit, torch/transformers versions, row counts,
 a SHA-256 of each unit's key columns and the git commit; `progress.json` lets an interrupted run resume.

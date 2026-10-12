@@ -3,6 +3,7 @@ Bundle the processed files Colab needs for Sprint 4 into ONE tar (no raw data, n
 
     python experiments/scripts/pack_colab_data.py --dry-run
     python experiments/scripts/pack_colab_data.py                     # -> dist/esl_colab_pack.tar  (dist/ is gitignored)
+    python experiments/scripts/pack_colab_data.py --side              # -> dist/esl_side_pack.tar   (head training; run export_side_features.py first)
 
 Upload the tar to Drive (MyDrive/esl-pronunciation-data/), then the Colab notebook unpacks it onto Colab's local
 disk and sets DATA_ROOT to the unpacked folder. Archive paths are relative to the data root:
@@ -53,20 +54,31 @@ def collect(root: Path) -> list[tuple[Path, str]]:
     return files
 
 
+def collect_side(root: Path) -> list[tuple[Path, str]]:
+    """The small non-acoustic side-feature files written by experiments/scripts/export_side_features.py (US 4.1 heads)."""
+    tab = root / "processed" / "features" / "tables"
+    files = [(tab / f"{n}_side_{k}", f"processed/features/tables/{n}_side_{k}") for n in UNITS for k in ("X.npy", "names.json")]
+    missing = [str(p) for p, _ in files if not p.exists()]
+    if missing:
+        raise FileNotFoundError(f"run experiments/scripts/export_side_features.py first; missing e.g. {missing[:2]}")
+    return files
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--out", default="dist/esl_colab_pack.tar")
+    ap.add_argument("--out", default=None, help="default dist/esl_colab_pack.tar (dist/esl_side_pack.tar with --side)")
+    ap.add_argument("--side", action="store_true", help="pack only the small side-feature files (second tar for the head training)")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args(argv)
 
     root = get_data_root()
-    files = collect(root)
+    files = collect_side(root) if a.side else collect(root)
     total = sum(p.stat().st_size for p, _ in files)
     n_wav = sum(1 for _, n in files if n.endswith(".wav"))
     print(f"[pack] data root: {root}\n[pack] {len(files)} files ({n_wav} wav), {total / 1e9:.2f} GB")
     if a.dry_run:
         return
-    out = Path(a.out)
+    out = Path(a.out or ("dist/esl_side_pack.tar" if a.side else "dist/esl_colab_pack.tar"))
     out.parent.mkdir(parents=True, exist_ok=True)
     t = time.time()
     with tarfile.open(out, "w") as tar:                 # plain tar: wav files do not compress, and it unpacks fastest

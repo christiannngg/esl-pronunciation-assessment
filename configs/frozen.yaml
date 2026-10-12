@@ -20,3 +20,20 @@ extraction:
 #   so762_phone mean over the MFA phone interval                 -> (n, layers, dim)
 #   l2_phone    mean over the FIXED window around the annotated unit midpoint (half-width = baseline.yaml l2arctic_window_half_s)
 units: [so762_sentence, so762_word, so762_phone, l2_word, l2_phone]
+
+# ---- US 4.1 task heads on the frozen embeddings (read by src/models/frozen_heads.py) --------------------------------------------
+heads:
+  device: auto
+  primary_layer: 12          # layer used for the first benchmark; the per-layer sweep (US 4.2 / 4.3) varies this. 0 = conv front end, 1..12 = transformer
+  heads: [linear, mlp]
+  seeds: [0, 1, 2]           # `search` stage uses the first seed only; `final` re-fits the selected configs with all of them
+  mlp: {hidden: 512}
+  train: {lr: 0.002, batch_size: 1024, max_epochs: 40, patience: 5, train_eval_rows: 20000}   # early stopping on validation loss
+  tasks: [sent_accuracy, sent_fluency, sent_prosodic, sent_total, word_accuracy, phone_score, phone_mispron_t1.0, l2_phone_error, l2_word_error]
+  grids:                     # tuned on VALIDATION only (regression RMSE, classification macro-F1); cw = class weights in the loss
+    reg:
+      linear: {wd: [0.0001, 0.01]}
+      mlp: {dropout: [0.1, 0.3], wd: [0.01]}
+    clf:
+      linear: {wd: [0.001], cw: [none, balanced]}
+      mlp: {dropout: [0.1, 0.3], wd: [0.01], cw: [none, balanced]}

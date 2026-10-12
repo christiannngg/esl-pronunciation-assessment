@@ -34,7 +34,6 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC, SVR
 
-from src.features.aggregate import load_table
 
 REPO = Path(__file__).resolve().parents[2]
 ERROR_CLASSES = ["correct", "substitution", "deletion", "addition"]
@@ -90,6 +89,7 @@ def build_tasks(cfg: dict) -> dict[str, Task]:
 
 def load_task(task: Task, spec: dict | None = None):
     """X, y, meta for the full table (all splits). ``spec['extra'] == 'pros'`` appends the US 3.3 pitch/energy/pause features."""
+    from src.features.aggregate import load_table   # lazy: needs librosa, which the Colab head runs do not need
     X, meta, names = load_table(task.table)
     if spec and spec.get("extra") == "pros":
         E, meta_e, names_e = load_table(task.table + "_pros")
