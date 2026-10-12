@@ -230,6 +230,10 @@ def main(argv=None):
     from pathlib import Path
     for enc in a.encoders:
         df, preds[enc] = evaluate(enc, layer, a.mode, root=Path(a.results_root) if a.results_root else None)
+        if df.empty:
+            where = FH.results_root(enc, layer, a.mode, Path(a.results_root) if a.results_root else None)
+            raise SystemExit(f"[report] no head results found for {enc} under {where}\n"
+                             f"        expected {where}/<task>/<head>/<config>/fold*.npz - copy the Drive frozen_results folder there or pass --results-root")
         stem = OUT / f"{enc}_L{layer}_{a.mode}"
         df.to_csv(f"{stem}_results.csv", index=False)
         write_results_md(df, Path(f"{stem}_results.md"), enc, layer, a.mode)

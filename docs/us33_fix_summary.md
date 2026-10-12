@@ -12,15 +12,15 @@ Full tables: `results/tables/baseline/us33_before_after.md` / `.csv` (test, pair
 
 ## Results (test, same model before -> after)
 
-| Task (best model after fix) | Fix | Before | After | Change |
-|---|---|---|---|---|
-| Phone mispronunciation (<1.0), logreg | class weights + threshold | macro-F1 0.504, bal.acc 0.507, F1 0.03 | macro-F1 0.574, bal.acc 0.565, F1 0.18 | +0.070 [+0.050, +0.084] |
-| Phone mispronunciation (<1.0), RF | class weights + threshold | bal.acc 0.500, F1 0.00 | bal.acc 0.664, F1 0.23 | macro-F1 +0.09 [+0.058, +0.120] |
-| L2-ARCTIC phone error type (4-class), RF | class weights + threshold | macro-F1 0.254 | **0.403** | +0.149 [+0.132, +0.163] |
-| L2-ARCTIC word has-error, logreg | class weights | macro-F1 0.589, F1 0.47 | 0.615, F1 0.57 | +0.027 [+0.014, +0.039] |
-| Sentence accuracy / fluency / prosodic / total, RF | pitch + energy + pause / rate features | PCC 0.545 / 0.680 / 0.657 / 0.573 | PCC 0.617 / 0.747 / 0.728 / 0.651 | RMSE -0.085 / -0.116 / -0.116 / -0.101 (all p < 0.001) |
-| Word accuracy, RF | prosody features | RMSE 1.704, PCC 0.320 | 1.687, 0.343 | -0.017 [-0.030, -0.005] |
-| Phone score (all models) | none kept | RMSE 0.352, PCC 0.307 (RF) | unchanged | no fix beat the margin |
+| Task (best model after fix)                        | Fix                                    | Before                                 | After                                  | Change                                                 |
+| -------------------------------------------------- | -------------------------------------- | -------------------------------------- | -------------------------------------- | ------------------------------------------------------ |
+| Phone mispronunciation (<1.0), logreg              | class weights + threshold              | macro-F1 0.504, bal.acc 0.507, F1 0.03 | macro-F1 0.574, bal.acc 0.565, F1 0.18 | +0.070 [+0.050, +0.084]                                |
+| Phone mispronunciation (<1.0), RF                  | class weights + threshold              | bal.acc 0.500, F1 0.00                 | bal.acc 0.664, F1 0.23                 | macro-F1 +0.09 [+0.058, +0.120]                        |
+| L2-ARCTIC phone error type (4-class), RF           | class weights + threshold              | macro-F1 0.254                         | **0.403**                              | +0.149 [+0.132, +0.163]                                |
+| L2-ARCTIC word has-error, logreg                   | class weights                          | macro-F1 0.589, F1 0.47                | 0.615, F1 0.57                         | +0.027 [+0.014, +0.039]                                |
+| Sentence accuracy / fluency / prosodic / total, RF | pitch + energy + pause / rate features | PCC 0.545 / 0.680 / 0.657 / 0.573      | PCC 0.617 / 0.747 / 0.728 / 0.651      | RMSE -0.085 / -0.116 / -0.116 / -0.101 (all p < 0.001) |
+| Word accuracy, RF                                  | prosody features                       | RMSE 1.704, PCC 0.320                  | 1.687, 0.343                           | -0.017 [-0.030, -0.005]                                |
+| Phone score (all models)                           | none kept                              | RMSE 0.352, PCC 0.307 (RF)             | unchanged                              | no fix beat the margin                                 |
 
 L2-ARCTIC phone error type, per-class recall (RF, test): correct 1.00 -> 0.90, substitution 0.05 -> 0.32, deletion 0.00 -> 0.30, addition 0.00 -> 0.10. Precision falls (deletion 0.50 -> 0.23, addition 0.09), so the gain is a recall / precision trade, not new information. Compared with the best US 3.1 model on that task (SVM, macro-F1 0.326) the post-fix best model is +0.077.
 
