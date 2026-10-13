@@ -88,7 +88,9 @@ def world(tmp_path, monkeypatch):
                      "train": {"lr": 0.01, "batch_size": 64, "max_epochs": 3, "patience": 2, "train_eval_rows": 50},
                      "tasks": ["sent_accuracy", "phone_score", "phone_mispron_t1.0", "l2_phone_error", "l2_word_error"],
                      "grids": {"reg": {"linear": {"wd": [1e-4, 1e-2]}, "mlp": {"dropout": [0.1], "wd": [1e-2]}},
-                               "clf": {"linear": {"wd": [1e-3], "cw": ["none", "balanced"]}, "mlp": {"dropout": [0.1], "wd": [1e-2], "cw": ["none", "balanced"]}}}}}
+                               "clf": {"linear": {"wd": [1e-3], "cw": ["none", "balanced"]}, "mlp": {"dropout": [0.1], "wd": [1e-2], "cw": ["none", "balanced"]}}},
+                     "probe": {"tasks": ["sent_accuracy", "l2_word_error"],
+                               "grids": {"reg": {"linear": {"wd": [1e-2]}}, "clf": {"linear": {"wd": [1e-3], "cw": ["balanced"]}}}}}}
     monkeypatch.setattr(FH, "tables_dir", lambda: tdir)
     monkeypatch.setattr(FH, "SPLIT_CSV", tmp_path / "so762_speakers.csv")
     monkeypatch.setattr(FH, "load_config", lambda: cfg)
@@ -236,10 +238,16 @@ def test_decision_weights_change_predictions_only_in_the_cw_group(world):
     P1 = np.clip(0.12 + 0.2 * y + 0.05 * rng.normal(size=n), 0.01, 0.99)             # under-confident positive class: argmax predicts almost only 0
     P = np.c_[1 - P1, P1]
     meta = pd.DataFrame({"speaker": rng.choice(list("abcd"), n), "fold": rng.integers(0, 4, n)})
-    d = {"y": y, "pred": P.argmax(1), "proba": P, "meta": meta}
+    ytr = (rng.random(300) < 0.3).astype(int)
+    Ptr1 = np.clip(0.12 + 0.2 * ytr + 0.05 * rng.normal(size=300), 0.01, 0.99)
+    d = {"y": y, "pred": P.argmax(1), "proba": P, "meta": meta, "train_score": -0.2, "train_proba": np.c_[1 - Ptr1, Ptr1], "train_y": ytr}
     plain = RF.apply_variants(t, "none", d, d)
     cw = RF.apply_variants(t, "balanced", d, d)
     assert [v[0] for v in plain] == ["plain"] and [v[0] for v in cw] == ["cw", "cw+thr"]
+    assert cw[0][3] == pytest.approx(0.2)                                              # plain / cw: the stored argmax train score (sign-flipped back to macro-F1)
+    assert cw[1][3] > 0.55 and cw[1][3] > RF.primary(t, ytr, d["train_proba"].argmax(1))   # cw+thr: train scored with the SAME tuned weights
+    no_train = {k: v for k, v in d.items() if k not in ("train_proba", "train_y")}
+    assert np.isnan(RF.apply_variants(t, "balanced", d, no_train)[1][3])               # old result files: NaN, not a wrong number
     assert (cw[0][2] == d["pred"]).all() and d["pred"].sum() <= 2
     thr = cw[1][2]
     assert thr.sum() > 0.15 * n
@@ -277,6 +285,60 @@ def test_wrong_layer_does_not_learn_which_proves_the_layer_index_is_used(world):
         base = FH.results_root(ENC, layer, "emb", world["base"])
         score[layer] = FH.select_config(base, t, world["cfg"]["heads"], "linear", "none", y, meta)[0]
     assert score[12] < 0.5 * score[LAYER_NOISE]
+
+
+# ---- US 4.2: probe / force / ablation ------------------------------------------ #
+def test_parse_layers():
+    assert FH.parse_layers("0-3") == [0, 1, 2, 3] and FH.parse_layers("3,6,9") == [3, 6, 9] and FH.parse_layers("2-4,12") == [2, 3, 4, 12] and FH.parse_layers("12") == [12]
+
+
+def test_final_files_keep_train_probabilities_and_force_refits(world):
+    _run(world, "search", only_tasks=["l2_word_error"], only_heads=["linear"])
+    _run(world, "final", only_tasks=["l2_word_error"], only_heads=["linear"])
+    base = FH.results_root(ENC, 12, "emb+side", world["base"])
+    f = next(p for p in (base / "l2_word_error").rglob("fold0.npz") if p.parent.name.endswith("__final"))
+    d = np.load(f, allow_pickle=True)
+    assert d["train_proba"].shape == (50, 2) and len(d["train_y"]) == 50 and np.allclose(d["train_proba"].sum(1), 1, atol=1e-4)
+    stamp = f.stat().st_mtime_ns
+    _run(world, "final", only_tasks=["l2_word_error"], only_heads=["linear"])
+    assert f.stat().st_mtime_ns == stamp                                            # default: existing results are kept
+    _run(world, "final", only_tasks=["l2_word_error"], only_heads=["linear"], force=True)
+    assert f.stat().st_mtime_ns > stamp                                             # --force: re-fitted
+
+
+def test_probe_reuses_main_search_jobs_and_finds_the_informative_layer(world, capsys):
+    FH.run(ENC, 12, "emb+side", "search", only_tasks=["sent_accuracy", "l2_word_error"], cache=world["cache"], base=world["base"])
+    capsys.readouterr()
+    FH.run(ENC, 12, "emb+side", "search", cache=world["cache"], base=world["base"], probe=True)
+    assert "0 fitted" in capsys.readouterr().out                                    # identical config ids -> the layer-12 probe already exists
+    FH.run(ENC, 3, "emb+side", "search", cache=world["cache"], base=world["base"], probe=True)
+    base3 = FH.results_root(ENC, 3, "emb+side", world["base"])
+    assert sorted(p.parent.parent.name for p in base3.rglob("fold0.npz")) == ["linear", "linear"]       # one linear config per probe task
+    with pytest.raises(AssertionError):
+        FH.run(ENC, 3, "emb+side", "final", cache=world["cache"], base=world["base"], probe=True)
+    df = RF.layer_profile([ENC], [3, 12], "emb+side", root=world["base"])
+    assert set(df.task) == {"sent_accuracy", "l2_word_error"} and set(df.layer) == {3, 12}
+    v = df.set_index(["task", "layer"]).val
+    assert v[("sent_accuracy", 12)] < 0.5 * v[("sent_accuracy", 3)] and v[("l2_word_error", 12)] > v[("l2_word_error", 3)] + 0.1
+    RF.write_layer_profile(df, world["base"] / "lp", "emb+side")
+    md = (world["base"] / "lp.md").read_text()
+    assert "| best layer (val) |" in md and f"| {ENC} | 12 |" in md
+    if importlib.util.find_spec("matplotlib"):
+        assert (world["base"] / "lp.png").stat().st_size > 5000
+
+
+def test_ablation_table_shows_side_features_alone_cannot_learn_and_embedding_carries_the_signal(world):
+    for mode in ("emb+side", "emb", "side"):
+        FH.run(ENC, 12, mode, "search", cache=world["cache"], base=world["base"])
+        FH.run(ENC, 12, mode, "final", cache=world["cache"], base=world["base"])
+    df = RF.ablation(ENC, 12, root=world["base"], n_boot=60)
+    assert set(df["mode"]) == {"emb+side", "emb", "side"} and set(df.task) == {"sent_accuracy", "phone_score", "phone_mispron_t1.0", "l2_phone_error", "l2_word_error"}
+    s = df[df.task == "sent_accuracy"].set_index("mode")
+    assert s.loc["side", "rmse"] > 2 * s.loc["emb+side", "rmse"]                    # random side features carry no signal
+    assert s.loc["side", "full_minus_this"] < -0.5 and s.loc["side", "p"] < 0.05    # the paired test sees it
+    assert abs(s.loc["emb", "full_minus_this"]) < 0.25 * s.loc["side", "rmse"]      # embedding alone is about as good as embedding + (useless) side columns
+    RF.write_ablation_md(df, world["base"] / "ab.md", ENC, 12)
+    assert "full minus this" in (world["base"] / "ab.md").read_text()
 
 
 # ---- side-feature exporter -------------------------------------------------- #

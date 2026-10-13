@@ -37,3 +37,8 @@ heads:
     clf:
       linear: {wd: [0.001], cw: [none, balanced]}
       mlp: {dropout: [0.1, 0.3], wd: [0.01], cw: [none, balanced]}
+  probe:                     # US 4.2 per-layer sweep: one linear head per task, one seed (layer 12 is already covered by the main search)
+    tasks: [sent_accuracy, word_accuracy, phone_score, phone_mispron_t1.0, l2_phone_error, l2_word_error]
+    grids:
+      reg: {linear: {wd: [0.01]}}
+      clf: {linear: {wd: [0.001], cw: [balanced]}}

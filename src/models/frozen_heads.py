@@ -4,6 +4,8 @@ US 4.1 - lightweight task heads on FROZEN SSL embeddings (wav2vec 2.0 / HuBERT /
     python -m src.models.frozen_heads run    --encoder wavlm_base_plus --stage search
     python -m src.models.frozen_heads run    --encoder wavlm_base_plus --stage final     # re-fits ONLY the val-selected configs with all seeds
     python -m src.models.frozen_heads status --encoder wavlm_base_plus
+    python -m src.models.frozen_heads run    --encoder wavlm_base_plus --probe --layers 0-12   # fast per-layer linear probe (US 4.2)
+    python -m src.models.frozen_heads run    --encoder wavlm_base_plus --mode emb              # ablations: emb | side (| emb+side main)
 
 Runs on Colab (needs only the embedding cache, the *_meta tables, the *_side_X side features and data/splits); reporting is done by
 src/evaluation/report_frozen.py on the machine that holds the Sprint 3 results.
@@ -252,7 +254,8 @@ def fit_job(task: Task, data: dict, hcfg: dict, head: str, config: str, hp: dict
     else:
         pred = {k: decode_labels(task, mean[k].argmax(1)) for k in mean}
         extra = {"val_proba": mean["val"].astype(np.float32), "test_proba": mean["test"].astype(np.float32),
-                 "classes": np.array(task.labels).astype(str)}
+                 "classes": np.array(task.labels).astype(str),
+                 "train_proba": mean["train"].astype(np.float32), "train_y": yi[tr][sub]}      # lets the report score train with the SAME decision rule
     train_score = primary_score(task, y[tr][sub], pred["train"])
     out.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(out, val_pred=pred["val"], test_pred=pred["test"], train_score=train_score, n_train=len(tr), n_features=X.shape[1],
@@ -293,15 +296,31 @@ def main_tasks(cfg: dict, hcfg: dict) -> list[Task]:
     return [tasks[n] for n in hcfg["tasks"]]
 
 
+def parse_layers(spec: str) -> list[int]:
+    """'0-12' -> 0..12, '3,6,9' -> [3,6,9], '2-4,12' -> [2,3,4,12]."""
+    out = []
+    for part in str(spec).split(","):
+        lo, _, hi = part.partition("-")
+        out += list(range(int(lo), int(hi) + 1)) if hi else [int(lo)]
+    return out
+
+
+def probe_cfg(hcfg: dict) -> dict:
+    """The fast per-layer probe is the same job set as the main search restricted to one linear config per task kind, so every
+    layer-12 probe job already exists after the main run (same config ids, same files)."""
+    return {**hcfg, "grids": hcfg["probe"]["grids"], "tasks": hcfg["probe"]["tasks"], "heads": ["linear"]}
+
+
 def run(encoder: str, layer, mode: str, stage: str, only_tasks=None, only_heads=None, budget: float | None = None,
-        cache: Path | None = None, base: Path | None = None) -> None:
+        cache: Path | None = None, base: Path | None = None, probe: bool = False, force: bool = False) -> None:
     cfg = load_config()
-    hcfg = cfg["heads"]
+    hcfg = probe_cfg(cfg["heads"]) if probe else cfg["heads"]
+    assert not (probe and stage != "search"), "the layer probe is a search-stage job set (one seed)"
     device = pick_device(hcfg.get("device", "auto"))
     base = results_root(encoder, layer, mode, base)
     t_start, done, skipped = time.time(), 0, 0
     seeds_all = list(hcfg["seeds"])
-    print(f"[heads] {encoder} layer={layer} mode={mode} stage={stage} device={device} -> {base}")
+    print(f"[heads] {encoder} layer={layer} mode={mode} stage={stage}{' probe' if probe else ''}{' FORCE' if force else ''} device={device} -> {base}")
     for task in main_tasks(cfg, hcfg):
         if only_tasks and task.name not in only_tasks:
             continue
@@ -321,7 +340,7 @@ def run(encoder: str, layer, mode: str, stage: str, only_tasks=None, only_heads=
             for config, hp in todo:
                 for fold in task.folds:
                     out = job_path(base, task.name, head, config, fold, stage)
-                    if out.exists():
+                    if out.exists() and not force:
                         skipped += 1
                         continue
                     if budget and time.time() - t_start > budget:
@@ -357,6 +376,9 @@ if __name__ == "__main__":
     ap.add_argument("cmd", choices=["run", "status"])
     ap.add_argument("--encoder", required=True, choices=list(load_config()["encoders"]))
     ap.add_argument("--layer", default=None, help="int or 'a-b' (mean of layers); default heads.primary_layer")
+    ap.add_argument("--layers", default=None, help="with --probe: sweep these layers, 'a-b' range or comma list (default 0-12)")
+    ap.add_argument("--probe", action="store_true", help="fast per-layer linear probe (one config, one seed; configs/frozen.yaml heads.probe)")
+    ap.add_argument("--force", action="store_true", help="re-fit jobs that already have a result file (e.g. to add the train probabilities)")
     ap.add_argument("--mode", default="emb+side", choices=MODES)
     ap.add_argument("--stage", default="search", choices=["search", "final"])
     ap.add_argument("--tasks", nargs="*")
@@ -367,6 +389,10 @@ if __name__ == "__main__":
     layer = a.layer if a.layer is not None else load_config()["heads"]["primary_layer"]
     cache = cache_root(load_config(), a.cache_root)
     if a.cmd == "run":
-        run(a.encoder, layer, a.mode, a.stage, a.tasks, a.heads, a.budget, cache)
+        if a.probe and not a.layers:
+            a.layers = "0-12"
+        layers = parse_layers(a.layers) if a.layers else [layer]
+        for l in layers:
+            run(a.encoder, l, a.mode, a.stage, a.tasks, a.heads, a.budget, cache, probe=a.probe, force=a.force)
     else:
         status(a.encoder, layer, a.mode)

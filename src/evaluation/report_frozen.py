@@ -57,7 +57,7 @@ def better(task, a, b) -> bool:
 
 
 def pooled(base, task, head, config, stage, split, y_all, meta, proba=False):
-    ys, ps, ms, pr, tr = [], [], [], [], []
+    ys, ps, ms, pr, tr, trp, try_ = [], [], [], [], [], [], []
     for fold in task.folds:
         d = np.load(FH.job_path(base, task.name, head, config, fold, stage), allow_pickle=True)
         mask = split_masks(task, meta, fold)[split]
@@ -65,23 +65,33 @@ def pooled(base, task, head, config, stage, split, y_all, meta, proba=False):
         if proba:
             pr.append(d[f"{split}_proba"])
         tr.append(float(d["train_score"]))
+        if "train_proba" in d.files:
+            trp.append(d["train_proba"]); try_.append(d["train_y"])
     out = {"y": np.concatenate(ys), "pred": np.concatenate(ps), "meta": pd.concat(ms, ignore_index=True), "train_score": float(np.mean(tr))}
     if proba:
         out["proba"] = np.vstack(pr)
+    if trp:
+        out["train_proba"], out["train_y"] = np.vstack(trp), np.concatenate(try_)
     if "val_score_seeds" in d.files:
         out["seed_sd"] = float(np.std(d["val_score_seeds"]))
     return out
 
 
 def apply_variants(task, group, dv, dt):
-    """[(variant, val_pred, test_pred)] for one selected config: plain / cw argmax, and for the cw group also cw+thr (US 3.3 decision
-    weights: tuned on the whole validation set for test; cross-fitted on validation for the validation estimate)."""
-    out = [("plain" if group == "none" else "cw", dv["pred"], dt["pred"])]
+    """[(variant, val_pred, test_pred, train_primary)] for one selected config: plain / cw argmax, and for the cw group also cw+thr
+    (US 3.3 decision weights: tuned on the whole validation set for test; cross-fitted on validation for the validation estimate).
+    train_primary (RMSE / macro-F1 on a training subsample) is scored with the SAME decision rule as the variant; NaN when the
+    result file predates the saved train probabilities (re-run the final stage with --force)."""
+    base_train = dt["train_score"] if task.kind == "reg" else -dt["train_score"]
+    out = [("plain" if group == "none" else "cw", dv["pred"], dt["pred"], base_train)]
     if group == "balanced":
         yi = _enc(task, dv["y"])
         pv = decode(task, cross_fit_predict(task, dv["proba"], yi, _groups(task, dv["meta"])))
         w = fit_weights(task, dv["proba"], yi)
-        out.append(("cw+thr", pv, decode(task, (dt["proba"] * w).argmax(1))))
+        tr = np.nan
+        if "train_proba" in dt:
+            tr = primary(task, decode(task, dt["train_y"]), decode(task, (dt["train_proba"] * w).argmax(1)))
+        out.append(("cw+thr", pv, decode(task, (dt["proba"] * w).argmax(1)), tr))
     return out
 
 
@@ -104,9 +114,9 @@ def evaluate(encoder: str, layer, mode: str, n_boot: int | None = None, root=Non
                 stage = "final" if all(FH.job_path(base, task.name, head, config, f, "final").exists() for f in task.folds) else "search"
                 dv = pooled(base, task, head, config, stage, "val", y_all, meta, proba=task.kind == "clf")
                 dt = pooled(base, task, head, config, stage, "test", y_all, meta, proba=task.kind == "clf")
-                for vname, pv, pt in apply_variants(task, group, dv, dt):
+                for vname, pv, pt, trp in apply_variants(task, group, dv, dt):
                     cands.append({"variant": vname, "config": config, "stage": stage, "pv": pv, "pt": pt, "dv": dv, "dt": dt,
-                                  "val_primary": primary(task, dv["y"], pv)})
+                                  "train_primary": trp, "val_primary": primary(task, dv["y"], pv)})
             if not cands:
                 continue
             best = cands[0]
@@ -120,7 +130,7 @@ def evaluate(encoder: str, layer, mode: str, n_boot: int | None = None, root=Non
                     if split == "test":
                         ci = M.speaker_bootstrap(mm["speaker"].to_numpy(), _enc(task, y), _enc(task, p), _fast(task), n_boot=n_boot, seed=bcfg["bootstrap"]["seed"])
                         row.update({f"{k}_{s}": v for k, (lo, hi) in ci.items() for s, v in (("lo", lo), ("hi", hi))})
-                        row["train_primary"] = c["dt"]["train_score"] if task.kind == "reg" else -c["dt"]["train_score"]
+                        row["train_primary"] = c["train_primary"]
                         row["val_seed_sd"] = c["dt"].get("seed_sd", np.nan)
                     rows.append(row)
             head_preds[(task.name, head)] = {"y": best["dt"]["y"], "pred": best["pt"], "meta": best["dt"]["meta"], "variant": best["variant"],
@@ -215,6 +225,143 @@ def log_wandb(df: pd.DataFrame, encoder, layer, mode) -> None:
         run.finish()
 
 
+# --------------------------------------------------------------------------- #
+# US 4.2: per-layer probe profile and input ablation
+# --------------------------------------------------------------------------- #
+ENC_STYLE = {"wav2vec2_base": ("#2a78d6", "o"), "hubert_base": ("#eb6834", "s"), "wavlm_base_plus": ("#1baf7a", "^")}   # fixed colour per entity
+ENC_LABEL = {"wav2vec2_base": "wav2vec 2.0", "hubert_base": "HuBERT", "wavlm_base_plus": "WavLM"}
+
+
+def layer_profile(encoders, layers, mode: str = "emb+side", root=None) -> pd.DataFrame:
+    """One linear probe per (encoder, layer, task): the single probe config of configs/frozen.yaml heads.probe, scored with the plain
+    argmax rule (regression: RMSE; classification: macro-F1 with balanced class weights in the loss, no decision weights).
+    Layers are compared on VALIDATION; test is shown next to it, never used to pick a layer."""
+    hcfg = FH.probe_cfg(FH.load_config()["heads"])
+    rows = []
+    for task in FH.main_tasks(None, hcfg):
+        y_all, meta = FH.load_labels(task)
+        group = "none" if task.kind == "reg" else "balanced"
+        for enc in encoders:
+            for layer in layers:
+                base = FH.results_root(enc, layer, mode, root)
+                sel = FH.select_config(base, task, hcfg, "linear", group, y_all, meta)
+                if sel is None:
+                    continue
+                dv = pooled(base, task, "linear", sel[1], "search", "val", y_all, meta)
+                dt = pooled(base, task, "linear", sel[1], "search", "test", y_all, meta)
+                rv, rt = _score(task, dv["y"], dv["pred"]), _score(task, dt["y"], dt["pred"])
+                k = "rmse" if task.kind == "reg" else "macro_f1"
+                rows.append({"task": task.name, "kind": task.kind, "encoder": enc, "layer": int(layer), "mode": mode, "config": sel[1],
+                             "val": rv[k], "test": rt[k], "val_aux": rv["pcc"] if task.kind == "reg" else rv["balanced_acc"],
+                             "test_aux": rt["pcc"] if task.kind == "reg" else rt["balanced_acc"]})
+    return pd.DataFrame(rows)
+
+
+def write_layer_profile(df: pd.DataFrame, stem, mode: str) -> None:
+    """CSV + markdown (best layer per encoder by validation) + a small-multiples figure of the validation curves."""
+    df.to_csv(f"{stem}.csv", index=False)
+    lines = [f"# Per-layer linear probe ({mode}) - layer chosen on VALIDATION, test shown at that layer", "",
+             "Regression: RMSE (lower is better). Classification: macro-F1 (higher is better). One linear head, one seed per layer; layer 0 = conv front end.", ""]
+    for task, g in df.groupby("task", sort=False):
+        kind = g["kind"].iloc[0]
+        lines += [f"## {task}", "", "| encoder | best layer (val) | val | test | layer 12 val | layer 12 test |", "|---|---|---|---|---|---|"]
+        for enc, ge in g.groupby("encoder", sort=False):
+            b = ge.sort_values("val", ascending=(kind == "reg")).iloc[0]
+            l12 = ge[ge.layer == 12]
+            last = f"{l12.val.iloc[0]:.3f} | {l12.test.iloc[0]:.3f}" if len(l12) else "n/a | n/a"
+            lines.append(f"| {enc} | {int(b.layer)} | {b.val:.3f} | {b.test:.3f} | {last} |")
+        lines.append("")
+    open(f"{stem}.md", "w").write("\n".join(lines))
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except ImportError:
+        return
+    tasks = list(dict.fromkeys(df.task))
+    ncol = 3
+    fig, axes = plt.subplots((len(tasks) + ncol - 1) // ncol, ncol, figsize=(12, 3.4 * ((len(tasks) + ncol - 1) // ncol)), squeeze=False, sharex=True)
+    for ax, task in zip(axes.ravel(), tasks):
+        g = df[df.task == task]
+        kind = g["kind"].iloc[0]
+        for enc, ge in g.groupby("encoder", sort=False):
+            col, mk = ENC_STYLE.get(enc, ("#52514e", "o"))
+            ge = ge.sort_values("layer")
+            ax.plot(ge.layer, ge.val, color=col, marker=mk, ms=4.5, lw=1.8, label=ENC_LABEL.get(enc, enc))
+            b = ge.sort_values("val", ascending=(kind == "reg")).iloc[0]
+            ax.plot([b.layer], [b.val], marker=mk, ms=9, mfc="white", mec=col, mew=1.8, zorder=5)       # best layer by validation
+        ax.set_title(f"{task}  ({'RMSE, lower is better' if kind == 'reg' else 'macro-F1, higher is better'})", fontsize=9, loc="left", color="#0b0b0b")
+        ax.set_xticks(range(0, 13, 2))
+        ax.grid(axis="y", color="#e4e3df", lw=0.8)
+        for sp in ("top", "right"):
+            ax.spines[sp].set_visible(False)
+        for sp in ("left", "bottom"):
+            ax.spines[sp].set_color("#9a9992")
+        ax.tick_params(colors="#52514e", labelsize=8)
+    for ax in axes.ravel()[len(tasks):]:
+        ax.axis("off")
+    for ax in axes[-1]:
+        ax.set_xlabel("transformer layer (0 = conv front end)", fontsize=8, color="#52514e")
+    h, l = axes[0][0].get_legend_handles_labels()
+    fig.legend(h, l, loc="upper center", ncol=len(l), frameon=False, fontsize=9)
+    fig.text(0.5, 0.005, "validation score of a linear probe; open marker = best layer on validation", ha="center", fontsize=8, color="#52514e")
+    fig.tight_layout(rect=(0, 0.02, 1, 0.95))
+    fig.savefig(f"{stem}.png", dpi=160)
+    plt.close(fig)
+
+
+def best_head(preds, task_name, task_kind):
+    cand = [(h, preds[(task_name, h)]) for h in FH.HEADS if (task_name, h) in preds]
+    if not cand:
+        return None
+    return sorted(cand, key=lambda hp: hp[1]["val_primary"], reverse=(task_kind == "clf"))[0]
+
+
+def ablation(encoder: str, layer, modes=("emb+side", "emb", "side"), root=None, n_boot: int = 500) -> pd.DataFrame:
+    """Same protocol per input setting (best head and variant chosen on validation inside each setting); paired speaker bootstrap of
+    the full setting (emb+side) minus each ablated setting on the identical test rows."""
+    bcfg = load_baseline_config()
+    preds = {}
+    for m in modes:
+        df, preds[m] = evaluate(encoder, layer, m, n_boot=20, root=root)
+        if df.empty:
+            raise SystemExit(f"[report] no results for {encoder} layer {layer} mode {m}; run frozen_heads with --mode {m}")
+    rows = []
+    for task in build_tasks(bcfg).values():
+        if not any((task.name, h) in preds["emb+side"] for h in FH.HEADS):
+            continue
+        key = "rmse" if task.kind == "reg" else "macro_f1"
+        fast = _fast(task)
+        full_head, full = best_head(preds["emb+side"], task.name, task.kind)
+        y = _enc(task, full["y"])
+        spk = full["meta"]["speaker"].to_numpy()
+        for m in modes:
+            head, p = best_head(preds[m], task.name, task.kind)
+            assert (_enc(task, p["y"]) == y).all()
+            row = {"task": task.name, "encoder": encoder, "layer": layer, "mode": m, "head": head, "variant": p["variant"], **fast(y, _enc(task, p["pred"]))}
+            if m != "emb+side":
+                t = M.paired_speaker_bootstrap(spk, y, _enc(task, p["pred"]), _enc(task, full["pred"]), fast, key, n_boot=n_boot)
+                row.update({"full_minus_this": t["delta"], "lo": t["lo"], "hi": t["hi"], "p": t["p"]})
+            rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def write_ablation_md(df: pd.DataFrame, path, encoder, layer) -> None:
+    lines = [f"# Input ablation: {encoder}, layer {layer} - test set", "",
+             "`emb+side` = embedding + Sprint 3 non-acoustic columns (main setting); `emb` = embedding only; `side` = non-acoustic columns only (no audio). "
+             "Each setting uses its own validation-selected head / variant. Last column: (emb+side) minus this setting on the primary metric "
+             "(RMSE: negative means the full setting is better; macro-F1: positive means it is better), paired speaker bootstrap.", ""]
+    for task, g in df.groupby("task", sort=False):
+        reg = g["rmse"].notna().any()
+        lines += [f"## {task}", "", "| setting | head (variant) | test | full minus this (95% CI, p) |", "|---|---|---|---|"]
+        for r in g.itertuples():
+            val = f"RMSE {r.rmse:.3f} / PCC {r.pcc:.3f}" if reg else f"macro-F1 {r.macro_f1:.3f} / bal.acc {r.balanced_acc:.3f}"
+            d = "" if pd.isna(getattr(r, "p", np.nan)) else f"{r.full_minus_this:+.3f} [{r.lo:+.3f}, {r.hi:+.3f}] p={r.p:.3f}"
+            lines.append(f"| {r.mode} | {r.head} ({r.variant}) | {val} | {d} |")
+        lines.append("")
+    path.write_text("\n".join(lines))
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--encoders", nargs="+", required=True)
@@ -222,12 +369,30 @@ def main(argv=None):
     ap.add_argument("--mode", default="emb+side", choices=FH.MODES)
     ap.add_argument("--results-root", default=None, help="folder holding <encoder>/L<layer>/<mode>/... (default experiments/results/frozen)")
     ap.add_argument("--wandb", action="store_true")
+    ap.add_argument("--layer-profile", default=None, metavar="LAYERS", help="per-layer probe table + figure, e.g. 0-12 (needs run --probe results)")
+    ap.add_argument("--ablation", action="store_true", help="emb+side vs emb vs side for each encoder (needs run --mode emb / side results)")
     a = ap.parse_args(argv)
     layer = a.layer if a.layer is not None else FH.load_config()["heads"]["primary_layer"]
     OUT.mkdir(parents=True, exist_ok=True)
     bcfg = load_baseline_config()
     preds = {}
     from pathlib import Path
+    root = Path(a.results_root) if a.results_root else None
+    if a.layer_profile:
+        lo, hi = (a.layer_profile.split("-") + [a.layer_profile])[:2] if "-" in a.layer_profile else (a.layer_profile, a.layer_profile)
+        df = layer_profile(a.encoders, range(int(lo), int(hi) + 1), a.mode, root)
+        if df.empty:
+            raise SystemExit("[report] no probe results found; run `python -m src.models.frozen_heads run --probe --layers 0-12` first")
+        write_layer_profile(df, OUT / f"layer_profile_{a.mode}", a.mode)
+        print(f"[report] layer profile -> {OUT}/layer_profile_{a.mode}.(csv|md|png)")
+        return
+    if a.ablation:
+        for enc in a.encoders:
+            df = ablation(enc, layer, root=root)
+            df.to_csv(OUT / f"ablation_{enc}_L{layer}.csv", index=False)
+            write_ablation_md(df, OUT / f"ablation_{enc}_L{layer}.md", enc, layer)
+            print(f"[report] ablation -> {OUT}/ablation_{enc}_L{layer}.md")
+        return
     for enc in a.encoders:
         df, preds[enc] = evaluate(enc, layer, a.mode, root=Path(a.results_root) if a.results_root else None)
         if df.empty:
