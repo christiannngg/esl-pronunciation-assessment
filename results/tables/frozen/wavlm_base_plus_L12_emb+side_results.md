@@ -16,9 +16,9 @@ train_primary / val_seed_sd expose over-fitting and seed noise: RMSE for regress
 | word_accuracy      | mlp    | plain   | dropout0.1_hidden512_wd0.01            | RMSE 1.680 [1.464, 1.870] · PCC 0.376         | 1.575         | 0.0160      |
 | phone_score        | linear | plain   | wd0.01                                 | RMSE 0.345 [0.290, 0.393] · PCC 0.361         | 0.374         | 0.0010      |
 | phone_score        | mlp    | plain   | dropout0.3_hidden512_wd0.01            | RMSE 0.325 [0.274, 0.368] · PCC 0.493         | 0.274         | 0.0013      |
-| phone_mispron_t1.0 | linear | cw+thr  | cwbalanced_wd0.001                     | macro-F1 0.621 [0.591, 0.644] · bal.acc 0.607 | 0.630         | 0.0034      |
-| phone_mispron_t1.0 | mlp    | cw+thr  | cwbalanced_dropout0.3_hidden512_wd0.01 | macro-F1 0.638 [0.611, 0.659] · bal.acc 0.636 | 0.645         | 0.0198      |
-| l2_phone_error     | linear | cw+thr  | cwbalanced_wd0.001                     | macro-F1 0.481 [0.461, 0.495] · bal.acc 0.523 | 0.386         | 0.0134      |
-| l2_phone_error     | mlp    | cw+thr  | cwbalanced_dropout0.1_hidden512_wd0.01 | macro-F1 0.508 [0.482, 0.527] · bal.acc 0.537 | 0.431         | 0.0194      |
+| phone_mispron_t1.0 | linear | cw+thr  | cwbalanced_wd0.001                     | macro-F1 0.621 [0.591, 0.644] · bal.acc 0.607 | 0.694         | 0.0034      |
+| phone_mispron_t1.0 | mlp    | cw+thr  | cwbalanced_dropout0.3_hidden512_wd0.01 | macro-F1 0.638 [0.611, 0.659] · bal.acc 0.636 | 0.751         | 0.0198      |
+| l2_phone_error     | linear | cw+thr  | cwbalanced_wd0.001                     | macro-F1 0.481 [0.461, 0.495] · bal.acc 0.523 | 0.531         | 0.0134      |
+| l2_phone_error     | mlp    | cw+thr  | cwbalanced_dropout0.1_hidden512_wd0.01 | macro-F1 0.508 [0.482, 0.527] · bal.acc 0.537 | 0.591         | 0.0194      |
 | l2_word_error      | linear | plain   | cwnone_wd0.001                         | macro-F1 0.699 [0.680, 0.716] · bal.acc 0.699 | 0.740         | 0.0025      |
-| l2_word_error      | mlp    | cw+thr  | cwbalanced_dropout0.3_hidden512_wd0.01 | macro-F1 0.709 [0.691, 0.726] · bal.acc 0.710 | 0.771         | 0.0050      |
+| l2_word_error      | mlp    | cw+thr  | cwbalanced_dropout0.3_hidden512_wd0.01 | macro-F1 0.709 [0.691, 0.726] · bal.acc 0.710 | 0.774         | 0.0050      |
