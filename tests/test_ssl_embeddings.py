@@ -82,6 +82,27 @@ def test_pool_units_is_accurate_with_large_offsets():
     np.testing.assert_allclose(out[0], H[:, 100:107, :].astype(np.float64).mean(1), rtol=1e-12)
 
 
+def test_pool_units_max_std_matches_naive_and_single_frame_has_zero_std():
+    rng = np.random.default_rng(3)
+    H = rng.standard_normal((3, 40, 8)).astype(np.float32)
+    i0 = np.array([0, 5, 39, 10]); i1 = np.array([40, 6, 40, 30])
+    out = se.pool_units_max_std(H, i0, i1)
+    assert out.shape == (4, 3, 16)
+    for u in range(4):
+        seg = H[:, i0[u]:i1[u], :].astype(np.float64)
+        np.testing.assert_allclose(out[u, :, :8], seg.max(1), atol=1e-12)
+        np.testing.assert_allclose(out[u, :, 8:], seg.std(1), atol=1e-12)
+    assert (out[1, :, 8:] == 0).all() and (out[2, :, 8:] == 0).all()          # one-frame spans: std 0, max = the frame
+
+
+def test_word_ms_unit_has_the_rows_and_spans_of_the_word_unit(data_root):
+    tabs = se.build_tables(["so762_word", "so762_word_ms"], HALF)
+    w, ms = tabs["so762_word"], tabs["so762_word_ms"]
+    pd.testing.assert_frame_equal(w.df, ms.df)
+    assert w.keys_sha256 == ms.keys_sha256 and ms.kind == "segment_ms" and w.kind == "segment"
+    assert ms.width(768) == 2 * 768 and w.width(768) == 768
+
+
 def test_pool_utterance_is_mean_then_population_std():
     rng = np.random.default_rng(3)
     H = rng.standard_normal((3, 25, 6)).astype(np.float32)
@@ -225,6 +246,9 @@ def test_run_extraction_matches_naive_pooling(data_root, tmp_path):
             H = FakeEncoder()(wav).astype(np.float64)
             if t.kind == "utt":
                 ref = np.concatenate([H.mean(1), H.std(1)], -1)
+            elif t.kind == "segment_ms":
+                a, b = (int(v[0]) for v in se.unit_frames(H.shape[1], r.t0, r.t1))
+                ref = np.concatenate([H[:, a:b, :].max(1), H[:, a:b, :].std(1)], -1)
             else:
                 a, b = (int(v[0]) for v in se.unit_frames(H.shape[1], r.t0, r.t1))
                 ref = H[:, a:b, :].mean(1)
@@ -345,3 +369,18 @@ def test_pack_collects_exactly_the_files_the_extraction_needs(data_root):
     (aud / "so762" / "u2.wav").unlink()
     with pytest.raises(FileNotFoundError):
         _load_packer().collect(data_root)
+
+
+def test_pros_pack_checks_row_alignment_before_anything_is_uploaded(data_root):
+    tab = data_root / "processed" / "features" / "tables"
+    packer = _load_packer()
+    for n in packer.UNITS:
+        meta = pd.read_csv(tab / f"{n}_meta.csv.gz", dtype=str)
+        meta.to_csv(tab / f"{n}_pros_meta.csv.gz", index=False)
+        np.save(tab / f"{n}_pros_X.npy", np.zeros((len(meta), 2), np.float32))
+        (tab / f"{n}_pros_names.json").write_text("[]")
+    names = sorted(n for _, n in packer.collect_pros(data_root))
+    assert len(names) == 10 and "processed/features/tables/so762_word_pros_X.npy" in names
+    pd.read_csv(tab / "so762_word_meta.csv.gz", dtype=str).iloc[::-1].to_csv(tab / "so762_word_pros_meta.csv.gz", index=False)     # same rows, other order
+    with pytest.raises(ValueError, match="not aligned"):
+        packer.collect_pros(data_root)

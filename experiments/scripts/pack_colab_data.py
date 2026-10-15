@@ -4,6 +4,7 @@ Bundle the processed files Colab needs for Sprint 4 into ONE tar (no raw data, n
     python experiments/scripts/pack_colab_data.py --dry-run
     python experiments/scripts/pack_colab_data.py                     # -> dist/esl_colab_pack.tar  (dist/ is gitignored)
     python experiments/scripts/pack_colab_data.py --side              # -> dist/esl_side_pack.tar   (head training; run export_side_features.py first)
+    python experiments/scripts/pack_colab_data.py --pros              # -> dist/esl_pros_pack.tar   (US 4.3: the US 3.3 pitch / energy / pause columns)
 
 Upload the tar to Drive (MyDrive/esl-pronunciation-data/), then the Colab notebook unpacks it onto Colab's local
 disk and sets DATA_ROOT to the unpacked folder. Archive paths are relative to the data root:
@@ -64,21 +65,41 @@ def collect_side(root: Path) -> list[tuple[Path, str]]:
     return files
 
 
+def collect_pros(root: Path) -> list[tuple[Path, str]]:
+    """The US 3.3 prosody columns (<unit>_pros_X.npy + names) for the US 4.3 heads. Row alignment with the Sprint 3 tables is checked here,
+    on the machine that has both, because Colab only receives the *_meta tables of the base units."""
+    tab = root / "processed" / "features" / "tables"
+    files = [(tab / f"{n}_pros_{k}", f"processed/features/tables/{n}_pros_{k}") for n in UNITS for k in ("X.npy", "names.json")]
+    missing = [str(p) for p, _ in files if not p.exists()]
+    if missing:
+        raise FileNotFoundError(f"US 3.3 prosody tables not found, e.g. {missing[:2]}")
+    import numpy as np
+    for n in UNITS:
+        base = pd.read_csv(tab / f"{n}_meta.csv.gz", dtype=str)
+        pm = pd.read_csv(tab / f"{n}_pros_meta.csv.gz", dtype=str)
+        keys = [c for c in ("utt_id", "word_idx", "phone_idx") if c in base.columns and c in pm.columns]
+        n_rows = np.load(tab / f"{n}_pros_X.npy", mmap_mode="r").shape[0]
+        if not (len(base) == len(pm) == n_rows and base[keys].equals(pm[keys])):
+            raise ValueError(f"{n}: prosody rows ({n_rows}) are not aligned with the Sprint 3 table ({len(base)} rows, keys {keys})")
+    return files
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--out", default=None, help="default dist/esl_colab_pack.tar (dist/esl_side_pack.tar with --side)")
+    ap.add_argument("--out", default=None, help="default dist/esl_colab_pack.tar (dist/esl_side_pack.tar with --side, esl_pros_pack.tar with --pros)")
     ap.add_argument("--side", action="store_true", help="pack only the small side-feature files (second tar for the head training)")
+    ap.add_argument("--pros", action="store_true", help="pack only the US 3.3 prosody columns (third tar, US 4.3)")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args(argv)
 
     root = get_data_root()
-    files = collect_side(root) if a.side else collect(root)
+    files = collect_pros(root) if a.pros else collect_side(root) if a.side else collect(root)
     total = sum(p.stat().st_size for p, _ in files)
     n_wav = sum(1 for _, n in files if n.endswith(".wav"))
     print(f"[pack] data root: {root}\n[pack] {len(files)} files ({n_wav} wav), {total / 1e9:.2f} GB")
     if a.dry_run:
         return
-    out = Path(a.out or ("dist/esl_side_pack.tar" if a.side else "dist/esl_colab_pack.tar"))
+    out = Path(a.out or ("dist/esl_pros_pack.tar" if a.pros else "dist/esl_side_pack.tar" if a.side else "dist/esl_colab_pack.tar"))
     out.parent.mkdir(parents=True, exist_ok=True)
     t = time.time()
     with tarfile.open(out, "w") as tar:                 # plain tar: wav files do not compress, and it unpacks fastest

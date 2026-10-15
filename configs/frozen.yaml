@@ -17,9 +17,10 @@ extraction:
 # Units are exactly the Sprint 3 rows (same order as data/processed/features/tables/<unit>_meta.csv.gz):
 #   *_sentence  mean||std over all frames of the file           -> (n, layers, 2*dim)
 #   *_word      mean over the word's aligned frames              -> (n, layers, dim)
+#   so762_word_ms  [max || std] over the same word frames as so762_word -> (n, layers, 2*dim)   (US 4.3, word-accuracy pooling)
 #   so762_phone mean over the MFA phone interval                 -> (n, layers, dim)
 #   l2_phone    mean over the FIXED window around the annotated unit midpoint (half-width = baseline.yaml l2arctic_window_half_s)
-units: [so762_sentence, so762_word, so762_phone, l2_word, l2_phone]
+units: [so762_sentence, so762_word, so762_phone, l2_word, l2_phone, so762_word_ms]   # so762_word_ms (US 4.3): same word spans pooled as [max, std]
 
 # ---- US 4.1 task heads on the frozen embeddings (read by src/models/frozen_heads.py) --------------------------------------------
 heads:
@@ -38,7 +39,83 @@ heads:
       linear: {wd: [0.001], cw: [none, balanced]}
       mlp: {dropout: [0.1, 0.3], wd: [0.01], cw: [none, balanced]}
   probe:                     # US 4.2 per-layer sweep: one linear head per task, one seed (layer 12 is already covered by the main search)
-    tasks: [sent_accuracy, word_accuracy, phone_score, phone_mispron_t1.0, l2_phone_error, l2_word_error]
+    tasks: [sent_accuracy, sent_fluency, sent_prosodic, sent_total, word_accuracy, phone_score, phone_mispron_t1.0, l2_phone_error, l2_word_error]   # the 3 extra sentence tasks were added for the US 4.3 layer re-selection
     grids:
       reg: {linear: {wd: [0.01]}}
       clf: {linear: {wd: [0.001], cw: [balanced]}}
+
+# ---- US 4.3 fixes (read by src/models/frozen_fix.py and src/evaluation/report_us43.py) -----------------------------------------------
+fix43:
+  root: experiments/results/frozen43     # <root>/<encoder>/<recipe>/<task>/<head>/<config>[__final]/fold<k>.npz  (+ <encoder>/mispron/oof.npz)
+  seeds_final: [0, 1, 2, 3, 4]           # `final` seed averaging for recipes that do not set `seeds` (the sentence recipes; US 4.1 used 3); `search` uses the first seed
+  ws_layers: [0, 12]                     # layers entering the learned weighted sum (inclusive; 0 = conv front end, which the probe showed can matter)
+  layer_window: [6, 12]                  # fix 1: layers a task may be re-selected from
+  shortlist_k: 2                         # fix 1: layers per task that get the full head protocol (probe-validation ranked)
+  mispron:                               # fix 5: per-age-group decision weights
+    n_folds: 5                           #   speaker-grouped out-of-fold probabilities over the TRAIN speakers
+    keep_if_pooled_val_drop_at_most: 0.005   #   group-specific weights are kept if pooled validation macro-F1 is not worse than global weights by more than this
+  recipes:
+    # fix 2: learned layer-weighted sum, every task, the US 4.1 grids (so the delta isolates the weighted sum)
+    ws:
+      layer: ws
+      tasks: [sent_accuracy, sent_fluency, sent_prosodic, sent_total, word_accuracy, phone_score, phone_mispron_t1.0, l2_phone_error, l2_word_error]
+      inputs: [emb, side]
+      seeds: [0, 1, 2]                   # same number of seeds as US 4.1, so the delta isolates the weighted sum
+    # fix 3: sentence regularisation (stronger weight decay / dropout / input dropout, PCA, 5-seed averaging), with and without the US 3.3 prosody columns
+    sent_ws:
+      layer: ws
+      tasks: &sent [sent_accuracy, sent_fluency, sent_prosodic, sent_total]
+      inputs: [emb, side]
+      hidden: 256
+      grids: &sent_grids
+        reg:
+          linear: {wd: [0.01, 0.1, 1.0], in_drop: [0.0, 0.2]}
+          mlp: {dropout: [0.3, 0.5], wd: [0.1], in_drop: [0.0, 0.2]}
+        clf: {linear: {wd: [0.001], cw: [none, balanced]}, mlp: {dropout: [0.1], wd: [0.01], cw: [none, balanced]}}
+    sent_ws_pros:
+      layer: ws
+      tasks: *sent
+      inputs: [emb, side, pros]
+      hidden: 256
+      grids: *sent_grids
+    sent_avgpca:
+      layer: avg6-12
+      tasks: *sent
+      inputs: [emb, side]
+      hidden: 256
+      grids: &sent_pca_grids
+        reg:
+          linear: {wd: [0.01, 0.1, 1.0], pca: [32, 64, 128]}
+          mlp: {dropout: [0.3, 0.5], wd: [0.1], pca: [32, 64, 128]}
+        clf: {linear: {wd: [0.001], cw: [none, balanced]}, mlp: {dropout: [0.1], wd: [0.01], cw: [none, balanced]}}
+    sent_avgpca_pros:
+      layer: avg6-12
+      tasks: *sent
+      inputs: [emb, side, pros]
+      hidden: 256
+      grids: *sent_pca_grids
+    # fix 4: word accuracy, pooling over the word's frames. word_mean_pros is the control (same inputs, mean pooling only).
+    word_mean_pros:
+      layer: ws
+      pool: mean
+      tasks: [word_accuracy]
+      inputs: [emb, side, pros]
+      seeds: [0, 1, 2]
+    word_max_pros:
+      layer: ws
+      pool: max
+      tasks: [word_accuracy]
+      inputs: [emb, side, pros]
+      seeds: [0, 1, 2]
+    word_meanmax_pros:
+      layer: ws
+      pool: mean+max
+      tasks: [word_accuracy]
+      inputs: [emb, side, pros]
+      seeds: [0, 1, 2]
+    word_meanmaxstd_pros:
+      layer: ws
+      pool: mean+max+std
+      tasks: [word_accuracy]
+      inputs: [emb, side, pros]
+      seeds: [0, 1, 2]

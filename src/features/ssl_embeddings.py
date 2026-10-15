@@ -23,6 +23,8 @@ Pooling rules
   * L2-ARCTIC phone: the same FIXED window (+-l2arctic_window_half_s around the annotated midpoint) the baseline used, so
     the annotated duration (which would leak deletions / additions) is not visible. L2-ARCTIC word: span of the non-addition units.
   * Sentence: mean and (population) std over every frame of the file; silence is not trimmed, as in Sprint 2/3.
+  * so762_word_ms (US 4.3): the SAME rows and frame spans as so762_word, pooled as [max over frames, population std over frames]
+    (n, layers, 2*dim). Together with so762_word (the mean) it gives mean / max / std pooling of a word without caching frames.
 Pooling is done in float64 on the CPU with a cumulative sum, so it is exact up to the fp16 cast on write.
 """
 
@@ -44,7 +46,7 @@ import pandas as pd
 from src.utils.paths import get_data_root
 
 REPO = Path(__file__).resolve().parents[2]
-CODE_VERSION = "ssl_embeddings-v1"
+CODE_VERSION = "ssl_embeddings-v2"          # v2 (US 4.3): adds the so762_word_ms unit
 
 # wav2vec 2.0 / HuBERT / WavLM base conv front end (same for the three base checkpoints; read from the model config when loaded)
 SR = 16000
@@ -53,13 +55,14 @@ CONV_STRIDE = (5, 2, 2, 2, 2, 2, 2)
 STRIDE_S = 320 / SR              # 20 ms between frames
 FIRST_CENTER_S = 200 / SR        # frame 0 covers samples [0, 400) -> centre at 12.5 ms
 
-UNITS = ("so762_sentence", "so762_word", "so762_phone", "l2_word", "l2_phone")
+UNITS = ("so762_sentence", "so762_word", "so762_phone", "l2_word", "l2_phone", "so762_word_ms")
 UNIT_KEYS = {
     "so762_sentence": ["utt_id"],
     "so762_word": ["utt_id", "word_idx"],
     "so762_phone": ["utt_id", "word_idx", "phone_idx"],
     "l2_word": ["utt_id", "word_idx"],
     "l2_phone": ["utt_id", "phone_idx"],
+    "so762_word_ms": ["utt_id", "word_idx"],        # same rows / spans as so762_word, pooled with max and std instead of mean (US 4.3)
 }
 SLOT_CLASSES = ("correct", "substitution", "deletion")      # L2-ARCTIC rows that occupy a canonical slot (additions / silence do not)
 
@@ -155,6 +158,17 @@ def pool_utterance(H: np.ndarray) -> np.ndarray:
     return np.concatenate([H64.mean(1), H64.std(1)], axis=-1)
 
 
+def pool_units_max_std(H: np.ndarray, i0: np.ndarray, i1: np.ndarray) -> np.ndarray:
+    """H (L, T, D) -> (n, L, 2D): [max over frames [i0, i1), population std over the same frames] per unit and layer (float64)."""
+    L, T, D = H.shape
+    out = np.empty((len(i0), L, 2 * D), np.float64)
+    for k, (a, b) in enumerate(zip(i0, i1)):
+        seg = H[:, a:b, :].astype(np.float64, copy=False)
+        out[k, :, :D] = seg.max(1)
+        out[k, :, D:] = seg.std(1)
+    return out
+
+
 # --------------------------------------------------------------------------- #
 # unit tables: Sprint 3 row order + the time span to pool for every row
 # --------------------------------------------------------------------------- #
@@ -167,10 +181,12 @@ class UnitTable:
 
     @property
     def kind(self) -> str:
-        return "utt" if self.name.endswith("_sentence") else "segment"
+        if self.name.endswith("_sentence"):
+            return "utt"
+        return "segment_ms" if self.name.endswith("_ms") else "segment"
 
     def width(self, dim: int) -> int:
-        return 2 * dim if self.kind == "utt" else dim
+        return dim if self.kind == "segment" else 2 * dim
 
 
 def _read_meta(name: str) -> pd.DataFrame:
@@ -201,20 +217,21 @@ def _attach_times(meta: pd.DataFrame, times: pd.DataFrame, keys: list[str], name
 def build_unit_table(name: str, l2_half_s: float) -> UnitTable:
     if name not in UNITS:
         raise ValueError(f"unknown unit {name!r}; expected one of {UNITS}")
-    meta = _read_meta(name)
+    base = name[:-3] if name.endswith("_ms") else name          # *_ms units reuse the rows / spans of their base unit
+    meta = _read_meta(base)
     keys = UNIT_KEYS[name]
     ali = alignments_dir()
-    if name == "so762_sentence":
+    if base == "so762_sentence":
         df = meta[["utt_id", "speaker"]].copy()
         df["t0"], df["t1"] = np.nan, np.nan                               # whole file
-    elif name in ("so762_word", "so762_phone"):
-        src = "so762_words.csv.gz" if name == "so762_word" else "so762_phones.csv.gz"
+    elif base in ("so762_word", "so762_phone"):
+        src = "so762_words.csv.gz" if base == "so762_word" else "so762_phones.csv.gz"
         t = pd.read_csv(ali / src, dtype={"utt_id": str}, usecols=[*keys, "start", "end"]).rename(columns={"start": "t0", "end": "t1"})
         df = _attach_times(meta, t, keys, name)
     else:
         clean = pd.read_csv(ali / "l2arctic_phones_clean.csv.gz", dtype={"utt_id": str, "speaker": str})
         clean = clean[clean["corpus"] == "arctic"]
-        if name == "l2_phone":
+        if base == "l2_phone":
             t = clean[["utt_id", "phone_idx", "start", "end"]].copy()
             mid = 0.5 * (t["start"] + t["end"])
             t["t0"], t["t1"] = mid - l2_half_s, mid + l2_half_s            # fixed window, as in aggregate.build_l2arctic
@@ -342,6 +359,9 @@ def run_extraction(tables: dict[str, UnitTable], utts: pd.DataFrame, encode, wav
                     continue
                 if t.kind == "utt":
                     v = pool_utterance(H)[None]
+                elif t.kind == "segment_ms":
+                    i0, i1 = unit_frames(H.shape[1], t0s[name][idx], t1s[name][idx])
+                    v = pool_units_max_std(H, i0, i1)
                 else:
                     i0, i1 = unit_frames(H.shape[1], t0s[name][idx], t1s[name][idx])
                     v = pool_units(H, i0, i1)

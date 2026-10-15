@@ -95,12 +95,13 @@ def apply_variants(task, group, dv, dt):
     return out
 
 
-def evaluate(encoder: str, layer, mode: str, n_boot: int | None = None, root=None):
-    """Long table + {(task, head): test dict of the headline variant} for one encoder."""
+def evaluate(encoder: str, layer, mode: str, n_boot: int | None = None, root=None, hcfg=None, base=None):
+    """Long table + {(task, head): test dict of the headline variant} for one encoder.
+    ``hcfg`` / ``base`` let the US 4.3 recipes (own grids and result folder) reuse the same selection and scoring."""
     bcfg = load_baseline_config()
-    hcfg = FH.load_config()["heads"]
+    hcfg = hcfg or FH.load_config()["heads"]
     n_boot = n_boot or bcfg["bootstrap"]["n_boot"]
-    base = FH.results_root(encoder, layer, mode, root)
+    base = base or FH.results_root(encoder, layer, mode, root)
     rows, head_preds = [], {}
     for task in FH.main_tasks(None, hcfg):
         y_all, meta = FH.load_labels(task)
@@ -134,7 +135,8 @@ def evaluate(encoder: str, layer, mode: str, n_boot: int | None = None, root=Non
                         row["val_seed_sd"] = c["dt"].get("seed_sd", np.nan)
                     rows.append(row)
             head_preds[(task.name, head)] = {"y": best["dt"]["y"], "pred": best["pt"], "meta": best["dt"]["meta"], "variant": best["variant"],
-                                              "val_primary": best["val_primary"]}
+                                              "val_primary": best["val_primary"], "config": best["config"], "stage": best["stage"],
+                                              "base": base}
     return pd.DataFrame(rows), head_preds
 
 
