@@ -451,7 +451,7 @@ def status(encoder: str, recipe: str, root: Path | None = None) -> None:
             for config, _ in FH.head_grid(hcfg, task, head):
                 rows.append((task.name, "search", all(FH.job_path(base, task.name, head, config, f).exists() for f in task.folds)))
             rows += [(task.name, "final", all(FH.job_path(base, task.name, head, c, f, "final").exists() for f in task.folds))
-                     for c in {p.parent.name.replace("__final", "") for p in (base / task.name / head).glob("*__final")}]
+                     for c in {p.name.replace("__final", "") for p in (base / task.name / head).glob("*__final")}]
     df = pd.DataFrame(rows, columns=["task", "stage", "done"])
     print(df.groupby(["task", "stage"])["done"].agg(["sum", "size"]).to_string())
 

@@ -46,3 +46,8 @@ Thumbs.db
 
 other/
 
+
+logs/
+*.zip
+PACK_MANIFEST.json
+processed/
