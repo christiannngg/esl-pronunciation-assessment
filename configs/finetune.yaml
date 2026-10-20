@@ -1,0 +1,52 @@
+# Sprint 5 end-to-end fine-tuning settings (read by src/models/finetune.py and src/evaluation/report_us5*.py)
+# One fine-tuned encoder PER TASK (the clean comparator for Sprint 6's multi-task question).
+seed: 42
+
+encoder: wavlm_base_plus            # key into configs/frozen.yaml `encoders` (same checkpoint / revision as the frozen runs)
+
+# US 5.1 recipe = "plain" end-to-end fine-tuning. US 5.3 changes ONE group of knobs at a time relative to this block, via `variants`.
+tasks: [sent_accuracy, sent_fluency, sent_prosodic, sent_total, word_accuracy, phone_score, phone_mispron_t1.0, l2_phone_error, l2_word_error]
+seeds: [0, 1, 2]                    # SO762 tasks: all seeds, seed-averaged predictions (as US 4.1). L2-ARCTIC: see `l2_seeds`
+l2_seeds: [0]                       # L2-ARCTIC is 4 folds x 2 tasks; one seed per fold unless the budget allows more
+
+model:
+  layers: [0, 12]                   # hidden states entering the learned weighted sum (0 = conv front end + projection, 1..12 = transformer)
+  layer_mode: ws                    # ws = softmax-weighted sum of per-layer LayerNorm'd pooled vectors | last = layer 12 only
+  head: mlp                         # linear | mlp (one hidden layer, GELU, dropout)
+  hidden: 256
+  head_dropout: 0.2
+  freeze_cnn: true                  # the 7-layer conv front end is never trained (standard for wav2vec 2.0-family fine-tuning)
+  freeze_layers: 0                  # US 5.3: freeze the bottom k transformer layers (partial fine-tuning); 0 = fine-tune all 12
+  # HF config overrides. Checkpoint defaults for dropouts; layerdrop and SpecAugment masking are OFF in 5.1 so US 5.3 can switch them on.
+  hf: {layerdrop: 0.0, apply_spec_augment: false, mask_time_prob: 0.0, mask_feature_prob: 0.0}
+
+train:
+  max_epochs: 15
+  patience: 4                       # early stopping on the validation primary metric (RMSE; macro-F1 with balanced class weights for clf)
+  lr_head: 1.0e-3
+  lr_alpha: 2.0e-2                  # the layer-weight logits (US 4.3 found them stuck at ~uniform with the head learning rate)
+  lr_encoder: 3.0e-5
+  layer_lr_decay: 1.0               # US 5.3: encoder layer i gets lr_encoder * decay^(12 - i); 1.0 = same lr for every layer
+  wd_head: 0.01
+  wd_encoder: 0.01                  # not applied to biases / LayerNorm
+  head_warmup_epochs: 1.0           # encoder frozen for this many epochs (linear-probe-then-fine-tune), head trains alone
+  warmup_frac: 0.1                  # of the post-freeze steps, linear warmup of the encoder lr
+  schedule: linear                  # linear | cosine decay to 0 at max_epochs
+  grad_clip: 1.0
+  amp: bf16                         # bf16 autocast for the encoder (pooling, heads, losses are fp32) | off
+  max_batch_seconds: 120            # audio seconds per training batch (length-bucketed)
+  pad_tolerance: 0.05               # utterances in one batch differ by at most 5 % in length (group-norm front end is padding-sensitive)
+  eval_batch_seconds: 240
+  train_eval_utts: 150              # training utterances re-scored in eval mode every epoch (loss-curve diagnosis)
+  final_train_eval_rows: 20000      # rows of training utterances scored with the best checkpoint (train_score, as US 4.1)
+  cw: balanced                      # classification: balanced class weights in the loss (decision weights are applied in the report)
+  save_checkpoint: best             # best | none ; written to results/models/finetune/ (gitignored)
+
+# US 5.2 diagnostic: hold out this fraction of each TRAINING speaker's utterances (never trained on) to measure "seen speaker, unseen utterance"
+holdout_seen_frac: 0.0              # 0 in every headline run; the diagnostic runs use --holdout-seen 0.2
+
+root: experiments/results/finetune  # <root>/<tag>/<task>/fold<k>/seed<s>.npz
+ckpt_root: results/models/finetune
+
+# US 5.3 variants: only the keys listed override the base blocks above. Filled in once US 5.2 has said what needs fixing.
+variants: {}

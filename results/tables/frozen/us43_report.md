@@ -13,7 +13,7 @@ Metric: RMSE for regression (lower is better), macro-F1 for classification (high
 | wavlm_base_plus | word_accuracy      | 1.704  | 1.687  | 1.680     | **1.633** | word_meanmaxstd_pros | -0.047 [-0.067, -0.029] p=0.000 | -0.054 [-0.089, -0.016] p=0.000 | better                |
 | wavlm_base_plus | phone_score        | 0.352  | 0.352  | 0.325     | **0.314** | ws                   | -0.011 [-0.018, -0.004] p=0.000 | -0.038 [-0.052, -0.024] p=0.000 | better                |
 | wavlm_base_plus | phone_mispron_t1.0 | 0.522  | 0.574  | 0.621     | **0.661** | mispron-grp          | +0.041 [+0.022, +0.059] p=0.000 | +0.088 [+0.061, +0.109] p=0.000 | better                |
-| wavlm_base_plus | l2_phone_error     | 0.326  | 0.403  | 0.508     | **0.523** | ws                   | +0.014 [-0.007, +0.035] p=0.208 | +0.120 [+0.089, +0.149] p=0.d000 | no significant change |
+| wavlm_base_plus | l2_phone_error     | 0.326  | 0.403  | 0.508     | **0.523** | ws                   | +0.014 [-0.007, +0.035] p=0.208 | +0.120 [+0.089, +0.149] p=0.d000| no significant change |
 | wavlm_base_plus | l2_word_error      | 0.596  | 0.615  | 0.709     | **0.716** | L11                  | +0.007 [+0.002, +0.013] p=0.004 | +0.100 [+0.082, +0.118] p=0.000 | better                |
 | hubert_base     | sent_accuracy      | 1.318  | 1.212  | 1.169     | **1.162** | L11                  | -0.007 [-0.030, +0.017] p=0.624 | -0.051 [-0.105, +0.002] p=0.064 | no significant change |
 | hubert_base     | sent_fluency       | 1.067  | 0.957  | 0.939     | **0.916** | L11                  | -0.023 [-0.047, -0.003] p=0.008 | -0.042 [-0.082, -0.006] p=0.028 | better                |
