@@ -449,7 +449,7 @@ def run_job(task: Task, td: TaskData, enc_cache: dict, cfg: dict, tag: str, fold
             if tcfg.get("grad_clip"):
                 nn.utils.clip_grad_norm_([p for g in opt.param_groups for p in g["params"]], float(tcfg["grad_clip"]))
             opt.step()
-            run_loss += float(loss) * len(rows)
+            run_loss += float(loss.detach()) * len(rows)
             n_units += len(rows)
             step += 1
         vr, vo = predict(va_u, exact=False)

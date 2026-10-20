@@ -6,7 +6,7 @@ Code: `src/models/finetune.py`, `configs/finetune.yaml`, `src/evaluation/report_
 ```
 git pull
 bash run_51_local.sh verify     # pooling in the fine-tuning code == cached Sprint 4 embeddings (must print OK)
-pytest tests/test_finetune.py   # tiny-model tests (torch + transformers)
+python -m pytest tests/test_finetune.py   # tiny-model tests (torch + transformers)
 bash run_51_local.sh smoke      # 2 epochs, 1 sentence + 1 phone job: check s/epoch and GPU memory
 bash run_51_local.sh train      # 9 tasks x folds x seeds, resumable (tag base)
 bash run_51_local.sh report     # results/tables/finetune/us51_report.md
