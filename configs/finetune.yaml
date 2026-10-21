@@ -40,6 +40,7 @@ train:
   train_eval_utts: 150              # training utterances re-scored in eval mode every epoch (loss-curve diagnosis)
   final_train_eval_rows: 20000      # rows of training utterances scored with the best checkpoint (train_score, as US 4.1)
   cw: balanced                      # classification: balanced class weights in the loss (decision weights are applied in the report)
+  augment: {noise_prob: 0.0, snr_db: [15, 35]}   # US 5.3: waveform noise on TRAINING batches only (timing untouched); 0.0 = off
   save_checkpoint: best             # best | none ; written to results/models/finetune/ (gitignored)
 
 # US 5.2 diagnostic: hold out this fraction of each TRAINING speaker's utterances (never trained on) to measure "seen speaker, unseen utterance"
@@ -49,7 +50,13 @@ root: experiments/results/finetune  # <root>/<tag>/<task>/fold<k>/seed<s>.npz
 ckpt_root: results/models/finetune
 
 # US 5.3 variants: only the keys listed override the base blocks above. Filled in once US 5.2 has said what needs fixing.
-variants: {}
+variants:                           # each variant changes ONE group of knobs relative to the 5.1 recipe ("base"); run with --tag <name> --variant <name>
+  lr:      {train: {lr_encoder: 1.5e-5, layer_lr_decay: 0.85, grad_clip: 0.5}}                 # W1 / W2 / W4: lower encoder lr, layer-wise decay (layer 1 gets 0.85^11 = 0.17x), tighter clip
+  reg:     {model: {head_dropout: 0.4}, train: {wd_head: 0.1, wd_encoder: 0.1}}                # W1 / W2: head dropout 0.2 -> 0.4, weight decay 0.01 -> 0.1
+  mask:    {model: {hf: {apply_spec_augment: true, mask_time_prob: 0.10, mask_time_length: 2, mask_time_min_masks: 0, mask_feature_prob: 0.0}}}   # SpecAugment time masking, 2-frame spans (phones are 3-10 frames)
+  noise:   {train: {augment: {noise_prob: 0.5, snr_db: [15, 35]}}}                             # waveform noise on half of the training utterances
+  freeze6: {model: {freeze_layers: 6}}                                                         # W1 / W2 / W6: bottom 6 transformer layers stay pretrained
+  freeze9: {model: {freeze_layers: 9}}                                                         # W6 only (run on the tasks in diagnose53.cost_tasks)
 
 # US 5.2 diagnosis: criteria fixed BEFORE the diagnostic runs were looked at (src/evaluation/diagnose_finetune.py). Decisions for US 5.3 rely on
 # validation-side evidence only (curves, gaps, seen-vs-held-out speakers, validation deltas); test-set group tables are descriptive.
@@ -66,4 +73,17 @@ diagnose52:
   risk_high: 3                   # criteria triggered: >= 3 high, 2 medium, else low
   risk_medium: 2
   seen_tag: base__seen
+  n_boot: 500
+
+# US 5.3 targets and selection rule, fixed BEFORE any variant was run (docs/weakness_memo_s5.md section 6; src/evaluation/report_us53.py).
+# Everything below is computed from VALIDATION-side quantities of the training jobs; test numbers are reported afterwards and never select.
+diagnose53:
+  gap_best_max: 0.30             # relative train-vs-validation gap at the best epoch (same definition as C1)
+  loss_ratio_max_reg: 1.25       # last-epoch validation loss / its minimum, regression tasks
+  loss_ratio_max_clf: 1.50       # same, classification tasks (F1-selected, loss keeps rising in 5.1)
+  spike_ratio: 2.0               # no epoch's training loss may exceed 2x the previous epoch's (after the head-only epoch) in any job
+  margin_floor: 0.01             # non-inferiority margin = max(this, seed sd of the base validation metric within a fold); RMSE or macro-F1 units
+  cost_tasks: [sent_prosodic, phone_score, l2_word_error, word_accuracy]   # W6: fine-tuning gave little; a cheaper (frozen-bottom) variant is preferred if non-inferior
+  cost_variants: [freeze6, freeze9]
+  cost_saving: 0.20              # ... and at least 20 % faster per job
   n_boot: 500

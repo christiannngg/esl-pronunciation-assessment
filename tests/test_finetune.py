@@ -335,3 +335,56 @@ def test_report_classification_picks_between_argmax_and_decision_weights_on_vali
     P = R.pooled_ft(task, jobs, y_all, meta)
     v, pv, pt, tr, val = R.headline_variant(task, P["val"], P["test"])
     assert v in ("cw", "cw+thr") and set(np.unique(pt)) <= {0, 1} and 0 <= val <= 1 and 0 <= tr <= 1
+
+
+# --------------------------------------------------------------------------- #
+# US 5.3 knobs: SpecAugment-style masking, waveform noise, partial freezing
+# --------------------------------------------------------------------------- #
+def test_hf_time_masking_is_active_only_in_training_mode():
+    torch = pytest.importorskip("torch")
+    tr = pytest.importorskip("transformers")
+    torch.manual_seed(0)
+    cfg = tr.WavLMConfig(hidden_size=32, num_hidden_layers=2, num_attention_heads=2, intermediate_size=64, conv_dim=(16,) * 7,
+                         num_conv_pos_embeddings=16, num_conv_pos_embedding_groups=2, num_buckets=32, max_bucket_distance=64,
+                         hidden_dropout=0.0, attention_dropout=0.0, activation_dropout=0.0, feat_proj_dropout=0.0, layerdrop=0.0,
+                         apply_spec_augment=True, mask_time_prob=0.3, mask_time_length=2, mask_time_min_masks=0, mask_feature_prob=0.0)
+    enc = tr.WavLMModel(cfg)
+    x = torch.randn(1, 8000)
+    enc.eval()
+    with torch.no_grad():
+        a, b = enc(x).last_hidden_state, enc(x).last_hidden_state
+    assert torch.allclose(a, b)                                           # evaluation / head-only epoch / final predictions are unmasked and deterministic
+    enc.train()
+    with torch.no_grad():
+        c, d = enc(x).last_hidden_state, enc(x).last_hidden_state
+    assert not torch.allclose(c, d)                                       # training batches see different random masks
+
+
+def test_collate_noise_only_when_asked_and_keeps_lengths_and_spans(world):
+    pytest.importorskip("torch")
+    task = _task("sent_accuracy")
+    td = ft.TaskData(task, False, split_csv=world / "speakers.csv")
+    utts = td.utt_split(0)["train"][:3]
+    x0, lens0, sp0, rows0, *_ = ft.collate(td, utts, "cpu", None, None)
+    x1, lens1, sp1, rows1, *_ = ft.collate(td, utts, "cpu", None, None, {"noise_prob": 0.0, "snr_db": [15, 35]}, np.random.default_rng(0))
+    assert (x0 == x1).all()                                               # off by default
+    x2, lens2, sp2, rows2, *_ = ft.collate(td, utts, "cpu", None, None, {"noise_prob": 1.0, "snr_db": [15, 35]}, np.random.default_rng(0))
+    assert not (x0 == x2).all() and (lens0 == lens2).all() and (rows0 == rows2).all() and x0.shape == x2.shape
+    for b, n in enumerate(lens0):                                         # padding stays exactly zero
+        assert (x2[b, int(n):] == 0).all()
+
+
+def test_run_job_with_noise_and_frozen_bottom_runs_and_freezes(world):
+    pytest.importorskip("torch")
+    cfg = ft.deep_update(_tiny_cfg(world), {"model": {"freeze_layers": 2}, "train": {"augment": {"noise_prob": 1.0, "snr_db": [15, 35]}}})
+    task = _task("sent_accuracy")
+    td = ft.TaskData(task, False, split_csv=world / "speakers.csv")
+    enc = _tiny_encoder(0)
+    for layer in enc.encoder.layers[:2]:                                  # what load_encoder does for freeze_layers = 2
+        for p in layer.parameters():
+            p.requires_grad_(False)
+    before = [p.detach().clone() for p in enc.encoder.layers[0].parameters()]
+    r = ft.run_job(task, td, {"load": lambda mcfg: (enc, False)}, cfg, "tn", 0, 0, "cpu", 0.0, log=lambda *a: None)
+    assert np.isfinite(r["val"])
+    for p0, p1 in zip(before, enc.encoder.layers[0].parameters()):
+        assert (p0 == p1).all()                                           # frozen layer unchanged by training with noisy batches

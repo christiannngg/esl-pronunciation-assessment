@@ -342,9 +342,19 @@ def param_groups(model, tcfg: dict) -> list[dict]:
 # --------------------------------------------------------------------------- #
 # one job
 # --------------------------------------------------------------------------- #
-def collate(td: TaskData, utts, device, side_t, yt):
+def add_noise(w: np.ndarray, rng, snr_db) -> np.ndarray:
+    """US 5.3 augmentation: additive white Gaussian noise at an SNR drawn uniformly from ``snr_db`` (dB), relative to the utterance's own power.
+    Timing is untouched, so spans, durations and every label survive; a new array is returned (cached waveforms are never modified)."""
+    p = float(np.mean(np.square(w, dtype=np.float64)))
+    snr = rng.uniform(float(snr_db[0]), float(snr_db[1]))
+    return (w + rng.normal(0.0, np.sqrt(p / 10.0 ** (snr / 10.0)), size=w.shape)).astype(np.float32)
+
+
+def collate(td: TaskData, utts, device, side_t, yt, aug=None, aug_rng=None):
     torch = _torch()
     wavs = [td.wav(int(u)) for u in utts]
+    if aug and float(aug.get("noise_prob", 0.0)) > 0 and aug_rng is not None:          # training batches only
+        wavs = [add_noise(w, aug_rng, aug["snr_db"]) if aug_rng.random() < float(aug["noise_prob"]) else w for w in wavs]
     lens = np.array([len(w) for w in wavs])
     x = torch.zeros((len(wavs), int(lens.max())), dtype=torch.float32)
     for b, w in enumerate(wavs):
@@ -400,6 +410,7 @@ def run_job(task: Task, td: TaskData, enc_cache: dict, cfg: dict, tag: str, fold
     groups = param_groups(model, tcfg)
     opt = torch.optim.AdamW(groups)
     rng = np.random.default_rng(seed)
+    aug, aug_rng = tcfg.get("augment") or {}, np.random.default_rng(seed + 1000)
     max_s, tol = int(tcfg["max_batch_seconds"] * SR), float(tcfg["pad_tolerance"])
     steps_per_epoch = len(make_batches(td.lengths[tr_u], max_s, tol))
     total = steps_per_epoch * int(tcfg["max_epochs"])
@@ -443,7 +454,7 @@ def run_job(task: Task, td: TaskData, enc_cache: dict, cfg: dict, tag: str, fold
             model.enc.train(model.train_encoder)
             for g in opt.param_groups:
                 g["lr"] = g["base_lr"] * (e_s if g["kind"] == "enc" else h_s)
-            x, lens, spans, rows, side, y = collate(td, tr_u[bidx], dev, side_t, yt)
+            x, lens, spans, rows, side, y = collate(td, tr_u[bidx], dev, side_t, yt, aug, aug_rng)
             out = model(x, lens, spans, side, amp)
             loss = loss_fn(out.squeeze(-1) if reg else out, y)
             opt.zero_grad(set_to_none=True)
