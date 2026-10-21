@@ -50,3 +50,20 @@ ckpt_root: results/models/finetune
 
 # US 5.3 variants: only the keys listed override the base blocks above. Filled in once US 5.2 has said what needs fixing.
 variants: {}
+
+# US 5.2 diagnosis: criteria fixed BEFORE the diagnostic runs were looked at (src/evaluation/diagnose_finetune.py). Decisions for US 5.3 rely on
+# validation-side evidence only (curves, gaps, seen-vs-held-out speakers, validation deltas); test-set group tables are descriptive.
+diagnose52:
+  gap_rel: 0.30                  # C1 overfit: relative train-vs-validation gap at the best epoch  (RMSE: (val-train)/val;  macro-F1: (train-val)/train)
+  val_loss_rise: 0.25            # C2 overfit: validation loss at the last epoch is >= 25 % above its minimum ...
+  train_loss_drop: 0.25          #    ... while the training loss fell >= 25 % since the best epoch   (share of jobs >= diverge_share)
+  diverge_share: 0.5
+  early_best_epoch: 1            # C3 instability: best epoch <= 1 (0 = head-only epoch) in >= early_best_share of the jobs
+  early_best_share: 0.5
+  min_gain_rel: 0.02             # C4 low value: fine-tuning improved validation by < 2 % over the job's own head-only epoch in >= low_gain_share of jobs
+  low_gain_share: 0.5
+  seen_gap_rel: 0.15             # C5 overfit (speakers): seen-speaker / unseen-utterance score beats held-out-speaker validation by >= 15 % AND the CI excludes 0
+  risk_high: 3                   # criteria triggered: >= 3 high, 2 medium, else low
+  risk_medium: 2
+  seen_tag: base__seen
+  n_boot: 500
