@@ -362,6 +362,8 @@ def run_job(task: Task, td: TaskData, enc_cache: dict, cfg: dict, tag: str, fold
     nn = torch.nn
     mcfg, tcfg = cfg["model"], cfg["train"]
     t_start = time.time()
+    if torch.cuda.is_available():
+        torch.cuda.reset_peak_memory_stats()
     torch.manual_seed(seed)
     np.random.seed(seed)
     dev = torch.device(device)
@@ -526,7 +528,8 @@ def run_job(task: Task, td: TaskData, enc_cache: dict, cfg: dict, tag: str, fold
     del model, opt
     if dev.type == "cuda":
         torch.cuda.empty_cache()
-    return {"val": val_score, "train": train_score, "best_epoch": best_ep, "epochs": len(hist["val_loss"]), "fit_s": time.time() - t_start}
+    peak = torch.cuda.max_memory_allocated() / 2 ** 30 if torch.cuda.is_available() else 0.0
+    return {"val": val_score, "train": train_score, "best_epoch": best_ep, "epochs": len(hist["val_loss"]), "fit_s": time.time() - t_start, "peak_gb": peak}
 
 
 # --------------------------------------------------------------------------- #
@@ -580,7 +583,7 @@ def cmd_run(args) -> None:
                 print(f"=== {args.tag} {name} fold{fold} seed{seed} ({device})")
                 r = run_job(task, td, cache, cfg, args.tag, fold, seed, device, hs)
                 fitted += 1
-                print(f"  -> val {r['val']:.4f} train {r['train']:.4f} best_epoch {r['best_epoch']} of {r['epochs']} ({r['fit_s']:.0f}s)")
+                print(f"  -> val {r['val']:.4f} train {r['train']:.4f} best_epoch {r['best_epoch']} of {r['epochs']} ({r['fit_s']:.0f}s, {r['fit_s'] / max(r['epochs'], 1):.0f}s/epoch, peak GPU {r['peak_gb']:.1f} GB)")
     print(f"finished: {fitted} fitted")
 
 
