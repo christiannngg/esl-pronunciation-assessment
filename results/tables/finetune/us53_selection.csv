@@ -1,0 +1,10 @@
+task,selected,reason,need_fix,margin,n_complete,n_eligible
+sent_accuracy,lr,lr meets the targets within the validation margin (best validation metric among 1 qualifying),True,0.010810054794548265,1,1
+sent_fluency,base,every variant is worse than base on validation by more than the margin,True,0.01,1,0
+sent_prosodic,base,base already meets the targets (no weakness to fix),False,0.01847734568951601,1,0
+sent_total,lr,lr meets the targets within the validation margin (best validation metric among 1 qualifying),True,0.01,1,1
+word_accuracy,base,base already meets the targets (no weakness to fix),False,0.021454725676720576,1,0
+phone_score,base,base already meets the targets (no weakness to fix),False,0.01,1,0
+phone_mispron_t1.0,base,every variant is worse than base on validation by more than the margin,True,0.01,1,0
+l2_phone_error,lr,lr meets the targets within the validation margin (best validation metric among 1 qualifying),True,0.01,1,1
+l2_word_error,lr,lr meets the targets within the validation margin (best validation metric among 1 qualifying),True,0.01,1,1
