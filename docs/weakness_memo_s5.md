@@ -1,6 +1,6 @@
 # Sprint 5 weakness memo (US 5.2): end-to-end fine-tuned WavLM-base-plus vs frozen 4.3
 
-**Status: draft for review.** Based on `results/tables/finetune/us52_report.md` (tags `base` = US 5.1 runs, `base__seen` = seen-speaker diagnostic runs), the curve figures `results/figures/us52/curves_{primary,loss}_base.png`, and `us51_report.md`. US 5.3 (fixes) had not been run when this was written; the plan is in section 6.
+**Status: draft for review.** Based on `results/tables/finetune/us52_report.md` (tags `base` = US 5.1 runs, `base__seen` = seen-speaker diagnostic runs), the curve figures `results/figures/us52/curves_{primary,loss}_base.png`, and `us51_report.md`. US 5.3 (fixes) was run after this memo was written: plan in section 6, outcome in `us53_fix_summary.md`.
 
 Scope: one fine-tuned `wavlm-base-plus` per task (CNN frozen, learned layer-weighted sum, MLP head, encoder lr 3e-5, early stopping on validation, patience 4, max 15 epochs). SO762: 3 seeds on its single fold. L2-ARCTIC: 4 folds, 1 seed each. Reference: frozen WavLM-base-plus from US 4.3.
 
