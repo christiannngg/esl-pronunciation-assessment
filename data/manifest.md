@@ -1,6 +1,7 @@
 # Data Manifest
 
 ## speechocean762
+
 - **available**: True
 - **license**: CC BY 4.0
 - **total_utterances**: 5000
@@ -13,6 +14,7 @@
 - **score_fields**: ['accuracy', 'completeness', 'fluency', 'prosodic', 'total']
 
 ## l2arctic
+
 - **available**: True
 - **license**: CC BY-NC 4.0 (non-commercial use only)
 - **total_speakers**: 24
@@ -23,29 +25,29 @@
 - **error_types_annotated**: ['substitution', 'deletion', 'addition']
 - **has_suitcase_corpus**: True
 
-| Speaker | L1 | Gender | # Wav | # Annotations |
-|---|---|---|---|---|
-| ABA | Arabic | M | 1129 | 150 |
-| SKA | Arabic | F | 974 | 150 |
-| YBAA | Arabic | M | 1130 | 149 |
-| ZHAA | Arabic | F | 1132 | 150 |
-| BWC | Mandarin | M | 1130 | 150 |
-| LXC | Mandarin | F | 1131 | 150 |
-| NCC | Mandarin | F | 1131 | 150 |
-| TXHC | Mandarin | M | 1132 | 150 |
-| ASI | Hindi | M | 1131 | 150 |
-| RRBI | Hindi | M | 1130 | 150 |
-| SVBI | Hindi | F | 1132 | 150 |
-| TNI | Hindi | F | 1131 | 150 |
-| HJK | Korean | F | 1131 | 150 |
-| HKK | Korean | M | 1131 | 150 |
-| YDCK | Korean | F | 1131 | 150 |
-| YKWK | Korean | M | 1131 | 150 |
-| EBVS | Spanish | M | 1007 | 150 |
-| ERMS | Spanish | M | 1132 | 150 |
-| MBMPS | Spanish | F | 1132 | 150 |
-| NJS | Spanish | F | 1131 | 150 |
-| HQTV | Vietnamese | M | 1132 | 150 |
-| PNV | Vietnamese | F | 1132 | 150 |
-| THV | Vietnamese | F | 1132 | 150 |
-| TLV | Vietnamese | M | 1132 | 150 |
+| Speaker | L1         | Gender | # Wav | # Annotations |
+| ------- | ---------- | ------ | ----- | ------------- |
+| ABA     | Arabic     | M      | 1129  | 150           |
+| SKA     | Arabic     | F      | 974   | 150           |
+| YBAA    | Arabic     | M      | 1130  | 149           |
+| ZHAA    | Arabic     | F      | 1132  | 150           |
+| BWC     | Mandarin   | M      | 1130  | 150           |
+| LXC     | Mandarin   | F      | 1131  | 150           |
+| NCC     | Mandarin   | F      | 1131  | 150           |
+| TXHC    | Mandarin   | M      | 1132  | 150           |
+| ASI     | Hindi      | M      | 1131  | 150           |
+| RRBI    | Hindi      | M      | 1130  | 150           |
+| SVBI    | Hindi      | F      | 1132  | 150           |
+| TNI     | Hindi      | F      | 1131  | 150           |
+| HJK     | Korean     | F      | 1131  | 150           |
+| HKK     | Korean     | M      | 1131  | 150           |
+| YDCK    | Korean     | F      | 1131  | 150           |
+| YKWK    | Korean     | M      | 1131  | 150           |
+| EBVS    | Spanish    | M      | 1007  | 150           |
+| ERMS    | Spanish    | M      | 1132  | 150           |
+| MBMPS   | Spanish    | F      | 1132  | 150           |
+| NJS     | Spanish    | F      | 1131  | 150           |
+| HQTV    | Vietnamese | M      | 1132  | 150           |
+| PNV     | Vietnamese | F      | 1132  | 150           |
+| THV     | Vietnamese | F      | 1132  | 150           |
+| TLV     | Vietnamese | M      | 1132  | 150           |

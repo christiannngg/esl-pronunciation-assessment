@@ -166,6 +166,11 @@ def build(variants: list[str], n_boot: int | None = None):
         pv_p = {v: tag_preds(FT.load_config(v), v, task, y_all, meta) for v in summ if v != BASE}
         pv_p[BASE] = base_p
         key = "rmse" if task.kind == "reg" else "macro_f1"
+        for r in vrows:                                                  # validation of the SEED-AVERAGED headline (same decision rule as the test headline); reported next to the job mean
+            if r["task"] == name:
+                p = pv_p.get(r["variant"])
+                r["val_headline"] = float("nan") if p is None else float(p["val_primary"])
+                r["val_headline_vs_base"] = float("nan") if p is None else float(p["val_primary"] - base_p["val_primary"])
         for v in summ:                                                   # test deltas for every variant (reported, not used to select)
             p = pv_p.get(v)
             if p is None or v == BASE:
@@ -179,7 +184,7 @@ def build(variants: list[str], n_boot: int | None = None):
         sp = pv_p[sel["selected"]]
         b, s0 = summ[BASE], summ[sel["selected"]]
         row = {"task": name, "metric": key, "selected": sel["selected"], "reason": sel["reason"], "need_fix": sel["need_fix"], "margin": sel["margin"],
-               "val_before": b["val"], "val_after": s0["val"], "gap_before": b["gap_best"], "gap_after": s0["gap_best"],
+               "val_before": b["val"], "val_after": s0["val"], "val_headline_before": base_p["val_primary"], "val_headline_after": sp["val_primary"], "gap_before": b["gap_best"], "gap_after": s0["gap_best"],
                "loss_ratio_before": b["loss_ratio"], "loss_ratio_after": s0["loss_ratio"], "spike_before": b["spike"], "spike_after": s0["spike"],
                "epochs_before": b["epochs_run"], "epochs_after": s0["epochs_run"], "fit_s_before": b["fit_s"], "fit_s_after": s0["fit_s"],
                "test_before": RF._score(task, base_p["y"], base_p["pred"])[key], "test_after": RF._score(task, sp["y"], sp["pred"])[key]}
@@ -214,9 +219,9 @@ def write_md(path: Path, t: dict, var: pd.DataFrame, sel: pd.DataFrame, head: pd
          "## 1. Selection per task", ""]
     L += D.md(sel, ["task", "selected", "need_fix", "n_complete", "n_eligible", "margin", "reason"])
     L += ["", "## 2. Before / after (selected variant vs base 5.1)", "",
-          "Validation and training-side columns are job means (`val` = early-stopping metric at the best epoch). Test is the seed-averaged headline (class-weight / threshold variant chosen on validation), "
+          "Validation and training-side columns are job means (`val` = early-stopping metric at the best epoch, plain argmax); `val_headline` is the seed-averaged validation score with the same decision rule as the test headline (cw / cw+thr tuned on validation). Test is the seed-averaged headline (class-weight / threshold variant chosen on validation), "
           "`d_vs_base` a paired speaker bootstrap of the selected model against base on the same test rows.", ""]
-    L += D.md(head, ["task", "selected", "val_before", "val_after", "gap_before", "gap_after", "loss_ratio_before", "loss_ratio_after", "spike_before", "spike_after", "test_before", "test_after",
+    L += D.md(head, ["task", "selected", "val_before", "val_after", "val_headline_before", "val_headline_after", "gap_before", "gap_after", "loss_ratio_before", "loss_ratio_after", "spike_before", "spike_after", "test_before", "test_after",
                      "d_vs_base", "d_vs_base_lo", "d_vs_base_hi", "verdict_vs_base"])
     if "verdict43_after" in head.columns:
         L += ["", "Against the frozen US 4.3 system of the same encoder (paired, test):", ""]
@@ -224,7 +229,7 @@ def write_md(path: Path, t: dict, var: pd.DataFrame, sel: pd.DataFrame, head: pd
     L += ["", "Cost (mean seconds per job, epochs run):", ""]
     L += D.md(head, ["task", "selected", "fit_s_before", "fit_s_after", "epochs_before", "epochs_after"], nd=1)
     L += ["", "## 3. Every variant (validation side; test shown for reference only)", ""]
-    cols = [c for c in ["task", "variant", "n_jobs", "val", "worse_by", "gap_best", "loss_ratio", "spike", "best_epoch", "epochs_run", "fit_s", "target_met", "eligible", "selected",
+    cols = [c for c in ["task", "variant", "n_jobs", "val", "worse_by", "val_headline", "val_headline_vs_base", "gap_best", "loss_ratio", "spike", "best_epoch", "epochs_run", "fit_s", "target_met", "eligible", "selected",
                         "test", "test_delta_vs_base", "test_lo", "test_hi", "test_verdict"] if c in var.columns]
     L += D.md(var, cols)
     if len(cal):
