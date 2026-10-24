@@ -109,13 +109,13 @@ land in one shared dashboard.
 3. Use the shared helper in `src/utils/tracking.py` to start runs — it
    auto-tags which environment a run came from:
 
-   ```python
-   from src.utils.tracking import init_run
+    ```python
+    from src.utils.tracking import init_run
 
-   run = init_run(job_type="baseline-train", config={"model": "svm"})
-   run.log({"val_mae": 0.42})
-   run.finish()
-   ```
+    run = init_run(job_type="baseline-train", config={"model": "svm"})
+    run.log({"val_mae": 0.42})
+    run.finish()
+    ```
 
 All runs are logged under the W&B project **`esl-pronunciation-assessment`**.
 
@@ -137,8 +137,52 @@ your local Mac before starting Sprint 1's data acquisition (US 1.2).
 
 ## Project Status
 
-- [x] US 1.1 — Reproducible dev environment
-- [ ] US 1.2 — SpeechOcean762 + L2-ARCTIC downloaded and organized
+Sprints 1–5 of 10 are complete (midterm checkpoint). Each model sprint ends with a documented weakness diagnosis and fix.
+
+| Sprint | Scope                                                        | Status  | Write-up                                                                          |
+| ------ | ------------------------------------------------------------ | ------- | --------------------------------------------------------------------------------- |
+| 1      | Environment, dataset acquisition                             | Done    | `data/README.md`, `data/manifest.md`                                              |
+| 2      | EDA, preprocessing, speaker-independent splits               | Done    | `docs/eda_summary.md`, `docs/preprocessing_summary.md`                            |
+| 3      | MFCC baselines, weakness diagnosis and fix                   | Done    | `docs/weakness_memo_s3.md`, `docs/us33_fix_summary.md`                            |
+| 4      | Frozen WavLM / HuBERT / wav2vec 2.0 heads, diagnosis and fix | Done    | `docs/us41_frozen_heads.md`, `docs/weakness_memo_s4.md`                           |
+| 5      | End-to-end fine-tuned WavLM, diagnosis and fix               | Done    | `docs/us51_finetuning.md`, `docs/weakness_memo_s5.md`, `docs/us53_fix_summary.md` |
+| 6      | Multi-task model (shared encoder, per-task heads)            | Next    |                                                                                   |
+| 7      | Midterm evaluation and scope review                          | Planned |                                                                                   |
+| 8      | Generalization and ablations (unseen speakers, by L1)        | Planned |                                                                                   |
+| 9      | Web app (FastAPI + React) and user validation                | Planned |                                                                                   |
+| 10     | Final evaluation, report, presentation                       | Planned |                                                                                   |
+
+### Results so far (test set)
+
+Test scores are for the best model at each stage. Macro-F1 (higher is better):
+
+| Task                            | MFCC baseline (S3) | After S3 fix | Frozen WavLM (S4) | Fine-tuned (S5.1) | Stabilized (S5.3) |
+| ------------------------------- | ------------------ | ------------ | ----------------- | ----------------- | ----------------- |
+| L2-ARCTIC phone error type      | 0.326              | 0.403        | 0.523             | 0.559             | 0.576             |
+| SpeechOcean762 mispronunciation | 0.522              | 0.574        | 0.661             | 0.680             | 0.680             |
+
+Full tables are in `results/tables/` (`baseline/`, `frozen/`, `finetune/`). All choices are made on validation speakers. Test is scored afterwards, with paired speaker-level bootstrap confidence intervals.
+
+### Weakness -> fix case studies
+
+1. **Sprint 3, class imbalance.** The MFCC baseline labelled almost every phone "correct" (addition recall 0.00). Class weights and tuned decision thresholds raised L2 phone error macro-F1 from 0.254 to 0.403 for the random forest, which is the model that fix applied to.
+2. **Sprint 4, wrong encoder layer.** wav2vec 2.0's last layer was poor on L2-ARCTIC. Re-selecting the layer gained +0.113 macro-F1 on phone error and made the frozen comparison fair.
+3. **Sprint 5, overfitting.** Early stopping hid large train-validation gaps. Six fix variants were tested. A lower encoder learning rate fixed over-confident classifier heads (L2 phone error +0.017, significant). On the sentence-score tasks the gap closed, but test performance did not improve.
+
+### Known open issues
+
+- Fine-tuning flattens predictions for the lowest-scoring words and phones, which hurts feedback quality. It is not yet addressed; a low-score re-weighted loss is planned for Sprint 6.
+- Two classification tasks still hit the 15-epoch cap.
+- L2-ARCTIC prompts overlap across speakers, so those results measure generalization to new speakers, not new sentences.
+
+### Reproducing results
+
+- Setup: see Environment Setup above and `environment.yml`.
+- Preprocessing: `python -m src.preprocessing.pipeline {audio,splits,mfa-prep,mfa-run,ingest}`.
+- Frozen encoders (Sprint 4): `run_43_local.sh`, `run_43_layers.sh`.
+- Fine-tuning (Sprint 5): `run_51_local.sh`, `run_52_local.sh`, `run_53_local.sh`. Each script's header comment lists its usage.
+- Reports: `python -m src.evaluation.report_us33` (and `report_us43`, `report_us51`, `report_us53`).
+- Tests: `pytest tests`.
 
 See `docs/methodology.md` (added in later sprints) for the full experimental
 design, and the project roadmap for the complete 10-sprint plan.
