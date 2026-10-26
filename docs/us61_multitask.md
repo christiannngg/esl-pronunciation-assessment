@@ -47,6 +47,8 @@ bash run_61_local.sh screen       # 7. which recipe goes forward
 bash run_61_local.sh report mt_base   # 8. comparison table (use the tag the screen chose)
 ```
 
+Running several jobs on the GPU at once: `bash run_61_local.sh --parallel N <command>` (works with `smoke`, `st-l2`, `train base|lr`). One job = one (group, seed) for `train`, one (variant, task, seed) for `st-l2`; jobs write different files and are seeded, so results equal a sequential run. Choose N with `bash run_61_local.sh --parallel 3 smoke` (prints wall time, peak GPU memory and per-job s/epoch; compare with the single `smoke`): N x peak GPU GB must fit in the card, and the total time must drop. Logs: `logs/61_<job>.log`. Never start two processes on the same (tag, group, seed).
+
 `report` writes `results/tables/multitask/us61_report_<tag>.md` (+ `us61_headline_<tag>.csv`, `us61_jobs_<tag>.csv`, `us61_efficiency_<tag>.csv`).
 
 ## 5. Known limits, stated before the results
