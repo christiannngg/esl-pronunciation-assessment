@@ -1,0 +1,52 @@
+# Sprint 6 multi-task settings (read by src/models/multitask.py and src/evaluation/report_us6*.py).
+#
+# The encoder, the `model` block and the `train` block are INHERITED from configs/finetune.yaml (the US 5.1 recipe, tag `base`), so the only thing
+# that differs between a single-task model and the multi-task model is that the encoder is shared. Only deltas are written here.
+# Variant names are looked up here first, then in finetune.yaml `variants` (so `--variant lr` is exactly the US 5.3 `lr` recipe).
+inherit: finetune.yaml
+
+# Two multi-task models (one shared encoder per GROUP). The two groups never share an encoder: they come from different corpora, speakers, splits
+# and label types (SO762 has one fixed split, L2-ARCTIC has 4 speaker folds). A 9-head joint model was considered and dropped (docs/us61_multitask.md).
+groups:
+  so762:
+    tasks: [sent_accuracy, sent_fluency, sent_prosodic, sent_total, word_accuracy, phone_score, phone_mispron_t1.0]
+  l2:
+    tasks: [l2_phone_error, l2_word_error]
+
+tasks: [sent_accuracy, sent_fluency, sent_prosodic, sent_total, word_accuracy, phone_score, phone_mispron_t1.0, l2_phone_error, l2_word_error]
+seeds: [0, 1, 2]                     # SO762 group: three seeds on its single fold (as US 5.1)
+l2_seeds: [0, 1, 2]                  # L2-ARCTIC group: 4 folds x 3 seeds (US 5.1 used one seed per fold; the single-task comparators are re-run for seeds 1, 2:
+                                     #   bash run_61_local.sh st-l2, tags `base_l2x` and `<variant>_l2x`)
+
+model:
+  alpha_mode: per_head               # per_head = every head learns its own layer-weighted sum (tasks use different layers, US 4.2/4.3) | shared
+
+train:
+  stop_metric: mean_rel              # ONE checkpoint per multi-task model, chosen on validation by the mean over heads of
+                                     #   error(epoch) / error(head-only epoch 0)   (error = RMSE, or 1 - macro-F1); lower is better. Scale free, no test data.
+  loss:
+    scheme: fixed                    # fixed (US 6.1) | uncertainty | gradnorm (US 6.3)
+    weights: {}                      # head -> weight; missing = 1. Normalised to sum 1 so grad clipping and Adam see the same scale as a single-task job.
+    lr: 1.0e-3                       # learning rate of learnable loss weights (US 6.3); unused by `fixed`
+  diag:                              # gradient diagnostics for US 6.2, written to <root>/<tag>/_group_<group>/
+    every_steps: 25                  # every N optimiser steps (after the head-only epoch) compute each head's gradient on the probe parameters
+    probe: top_layer                 # parameters of the last transformer layer that are trainable; the cheap, standard "last shared layer" probe
+  save_checkpoint: best
+
+root: experiments/results/multitask  # <root>/<tag>/<head>/fold<k>/seed<s>.npz  (same layout and keys as the single-task jobs: the US 5.1 report code reads them unchanged)
+ckpt_root: results/models/multitask
+
+# ---------------------------------------------------------------------------------------------------------------------------------------------------
+# US 6.1 protocol, fixed BEFORE any multi-task job was run (src/evaluation/report_us61.py). Choices use validation only; test numbers are reported afterwards.
+# ---------------------------------------------------------------------------------------------------------------------------------------------------
+compare61:
+  comparators: [base, stabilized]    # single-task US 5.1 (`base`) and the US 5.3 per-task selected variants (results/tables/finetune/us53_selection.csv)
+  margin_floor: 0.01                 # a head is "not worse on validation" if MT - ST <= max(this, seed sd of the single-task validation metric)  (as diagnose53)
+  n_boot: 500                        # paired speaker bootstrap on test (95 % CI); same rows, same speakers for both systems
+  extra_seed_tag_suffix: _l2x        # extra L2-ARCTIC single-task seeds (1, 2) live under <tag>_l2x so the Sprint 5 results are not modified
+  recipe_candidates: [base, lr]      # multi-task recipe screen = the same size of search the single-task models got per recipe, tags mt_base, mt_lr
+  recipe_rule: lowest mean of MT validation error / ST-base validation error over the heads; a candidate other than `base` must win by more than margin_floor
+
+variants:
+  # nothing multi-task specific yet; `lr` is inherited from finetune.yaml. US 6.3 adds the loss-weighting variants here.
+  sharedalpha: {model: {alpha_mode: shared}}                                  # ablation: one layer-weighted sum for all heads
