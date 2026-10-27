@@ -1,0 +1,10 @@
+group,task,transfer,delta,val_flag,gradient,conflicts_with,stopping_compromise,lagging,criteria_fired
+so762,sent_accuracy,no clear transfer,-0.0006053744409273,better,,,False,False,none
+so762,sent_fluency,no clear transfer,0.016902569273516,worse,,,False,False,none
+so762,sent_prosodic,no clear transfer,0.0114470487484908,worse,,,True,False,stopping compromise
+so762,sent_total,no clear transfer,-0.0109481388753589,better,,,False,False,none
+so762,word_accuracy,no clear transfer,-0.0005684542679007,worse,,,True,True,stopping compromise; lagging
+so762,phone_score,no clear transfer,-0.0033394986191766,within margin,,,False,True,lagging
+so762,phone_mispron_t1.0,negative transfer,-0.0255192012218784,within margin,starved,,True,True,starved gradient; stopping compromise; lagging
+l2,l2_phone_error,negative transfer,-0.0046740244936477,within margin,,,False,False,none
+l2,l2_word_error,no clear transfer,-0.0022778504828516,within margin,,,False,True,lagging
