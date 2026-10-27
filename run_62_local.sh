@@ -5,7 +5,7 @@
 #   test                 unit tests of the diagnosis code (CPU, seconds)
 #   analyse              the diagnosis from what already exists: transfer, gradient shares / conflict, stopping compromise, ablations that have been run
 #                        -> results/tables/multitask/us62_report.md (+ us62_*.csv, results/figures/multitask/us62_gradients_<group>.png)   NO GPU, a few minutes
-#   ablate <name>|all    SO762 ablation jobs (GPU), tag mt62_<name>, 3 seeds: phone_pair | w_mispron3 | drop_wordacc
+#   ablate <name>|all    SO762 ablation jobs (GPU), tag mt62_<name>, 3 seeds: phone_pair | word_phone | w_mispron3
 #   status               which ablations are finished
 #
 # Order: run `analyse` first (needs the US 6.1 headline csvs: report_us61 --tag mt_base --groups so762 ; report_us61 --tag mt_lr --variant lr --groups l2),
@@ -22,7 +22,7 @@ export MKL_NUM_THREADS="$OMP_NUM_THREADS"
 export PAR
 FAILED=logs/62_failed.txt; mkdir -p logs; : > "$FAILED"
 export FAILED
-ABLATIONS="phone_pair w_mispron3 drop_wordacc"
+ABLATIONS="phone_pair word_phone w_mispron3"
 
 # one work unit: repeat the call until it reports nothing left to fit (--budget 3000 s stops a call early)
 unit () {
@@ -59,9 +59,9 @@ case "${1:-}" in
   analyse|analyze)
     shift; python -m src.evaluation.report_us62 "$@" ;;
   ablate)
-    names="${2:-}"
+    names="${*:2}"
     [ "$names" = "all" ] && names="$ABLATIONS"
-    [ -z "$names" ] && { echo "usage: bash run_62_local.sh [--parallel N] ablate phone_pair|w_mispron3|drop_wordacc|all"; exit 1; }
+    [ -z "$names" ] && { echo "usage: bash run_62_local.sh [--parallel N] ablate phone_pair|word_phone|w_mispron3|all  (several names allowed)"; exit 1; }
     units=()
     for a in $names; do
       case " $ABLATIONS " in *" $a "*) ;; *) echo "unknown ablation $a (choose from: $ABLATIONS)"; exit 1 ;; esac

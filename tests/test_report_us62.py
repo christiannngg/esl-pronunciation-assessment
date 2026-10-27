@@ -35,6 +35,12 @@ def test_effective_share_includes_the_loss_weight():
     assert d["shares"] == pytest.approx([1 / 3] * 3) and d["eff_shares"] == pytest.approx([0.5, 0.25, 0.25])
 
 
+def test_effective_share_equals_share_when_weights_are_equal_even_if_norms_vary_by_epoch():
+    norms = np.array([[0, 0, 0], [1.0, 3.0, 1.0], [5.0, 1.0, 2.0], [2.0, 2.0, 8.0]])
+    d = R.job_diag(_group_hist(norms=norms, gn=(0, 5, 20, 10)))
+    assert d["eff_shares"] == pytest.approx(d["shares"])
+
+
 def test_dominance_label_thresholds():
     assert R.dominance_label(0.70, 4, 2.0) == "dominant"                # > 2/4 = 0.5
     assert R.dominance_label(0.50, 4, 2.0) == "balanced"                # not strictly greater
@@ -213,7 +219,7 @@ def test_config_declares_the_criteria_and_the_ablation_variants_load():
         assert a["train"]["max_epochs"] == cfg["train"]["max_epochs"] and a["encoder"] == cfg["encoder"]
         assert all(t in cfg["tasks"] for g in a["groups"].values() for t in g["tasks"])
     assert mt.load_config("phone_pair")["groups"]["so762"]["tasks"] == ["phone_score", "phone_mispron_t1.0"]
-    assert "word_accuracy" not in mt.load_config("drop_wordacc")["groups"]["so762"]["tasks"]
+    assert mt.load_config("word_phone")["groups"]["so762"]["tasks"] == ["word_accuracy", "phone_score", "phone_mispron_t1.0"]
     w = mt.normalise_weights(cfg["groups"]["so762"]["tasks"], mt.load_config("w_mispron3")["train"]["loss"]["weights"])
     assert w["phone_mispron_t1.0"] == pytest.approx(3 / 9) and w["sent_accuracy"] == pytest.approx(1 / 9)
     assert mt.load_config()["groups"] == mt.load_config("sharedalpha")["groups"]               # the full model's groups are untouched by the ablation variants

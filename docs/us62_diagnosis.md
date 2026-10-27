@@ -1,6 +1,6 @@
 # US 6.2: diagnosis of the multi-task models
 
-**Status: code, tests and run script written; the diagnosis has not been run yet.** Nothing in this file reports a result. Results go to `results/tables/multitask/us62_report.md` once `bash run_62_local.sh analyse` has run.
+**Status: the first diagnosis (`analyse`, no ablations) has been run; results are in `results/tables/multitask/us62_report.md` and summarised in the weakness memo. The ablations have not been run yet.**
 
 Research question 2 follow-up: *where does sharing the encoder help or hurt, and why?* US 6.1 found no significant gain on 8 of 9 heads and one significant loss (`phone_mispron_t1.0`, macro-F1 0.680 -> 0.654, CI [-0.045, -0.009]). US 6.2 looks for the reason.
 
@@ -36,7 +36,7 @@ What was seen before the criteria were set: the US 6.1 table. The suspicion that
 |---|---|---|
 | `phone_pair` | only `phone_score` and `phone_mispron_t1.0` share the encoder | interference from the sentence / word heads |
 | `w_mispron3` | all 7 heads, `phone_mispron_t1.0` loss weighted x3 (then normalised to sum 1) | under-weighting of that head (task imbalance) |
-| `drop_wordacc` | the 6 heads without `word_accuracy` | the word-level head drags the shared encoder |
+| `word_phone` | only the word / phone block: `word_accuracy`, `phone_score`, `phone_mispron_t1.0` (no sentence heads) | the four sentence heads crowd out the word / phone level (they hold 73 % of the gradient norm and are mutually aligned). **Added after the first diagnosis**, motivated by the block structure of the cosines; it replaced `drop_wordacc`, which that diagnosis made unattractive (`word_accuracy` is not dominant and is aligned with both phone heads) |
 
 Reading rule (declared): an ablation **recovers** a negatively transferred head if the head is no longer significantly worse than its single-task comparator *and* significantly better than in the full multi-task model; **partly** if only the second holds; **no effect** / **hurts** otherwise. Ablations change the number of heads, hence the stopping criterion (mean over the heads present); that is part of the intervention and is not corrected.
 
@@ -44,9 +44,9 @@ Reading rule (declared): an ablation **recovers** a negatively transferred head 
 
 ```bash
 bash run_62_local.sh test                       # 1. unit tests (CPU)
-python -m src.models.multitask dry-run --variant phone_pair   # 2. optional: the ablation groups build on the real tables (also drop_wordacc)
+python -m src.models.multitask dry-run --variant phone_pair   # 2. optional: the ablation groups build on the real tables (also word_phone)
 bash run_62_local.sh analyse                    # 3. diagnosis from existing results (no GPU); read results/tables/multitask/us62_report.md
-bash run_62_local.sh --parallel 2 ablate all    # 4. only after reading 3: the three ablations (9 jobs)
+bash run_62_local.sh --parallel 2 ablate phone_pair word_phone w_mispron3    # 4. only after reading 3: the three ablations (9 jobs)
 bash run_62_local.sh analyse                    # 5. again: picks up every finished ablation
 ```
 

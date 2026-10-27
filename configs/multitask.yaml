@@ -65,13 +65,14 @@ compare62:
   lag_margin: 0.02                   # LAGGING: error/error(head-only epoch) at the shared checkpoint exceeds the mean over heads by more than this
   negative_transfer: test verdict `worse` against the matched single-task comparator (paired speaker bootstrap 95 % CI excludes 0)
   ablation_tag_prefix: mt62_         # ablation tag = <prefix><variant>
-  ablations: [phone_pair, w_mispron3, drop_wordacc]
+  ablations: [phone_pair, word_phone, w_mispron3]
   ablation_reading: >
     For a head with negative transfer, an ablation `recovers` it if the head is no longer significantly worse than its single-task comparator AND is
     significantly better than in the full multi-task model; `partly` if only the second holds; `no effect` otherwise.
     phone_pair (phone_score + phone_mispron only) recovers -> interference from the sentence / word heads.
     w_mispron3 (that head's loss weight x3) recovers -> under-weighting (task imbalance).
-    drop_wordacc recovers -> the word_accuracy head drags the shared encoder.
+    word_phone (word_accuracy + the two phone heads, no sentence heads) recovers -> the four sentence heads (73 % of the gradient norm, mutually aligned) crowd out the
+    word / phone level. Added AFTER the first diagnosis (block structure of the gradient cosines); the thresholds above were not touched.
 
 variants:
   # `lr` is inherited from finetune.yaml. US 6.3 adds the loss-weighting variants here.
@@ -81,5 +82,5 @@ variants:
     groups: {so762: {tasks: [phone_score, phone_mispron_t1.0]}}
   w_mispron3:                                                                 # all seven heads, the phone_mispron_t1.0 loss weighted x3 (then normalised to sum 1)
     train: {loss: {weights: {phone_mispron_t1.0: 3.0}}}
-  drop_wordacc:                                                               # the six heads without word_accuracy
-    groups: {so762: {tasks: [sent_accuracy, sent_fluency, sent_prosodic, sent_total, phone_score, phone_mispron_t1.0]}}
+  word_phone:                                                                 # the word / phone block only (no sentence heads); added after the first diagnosis
+    groups: {so762: {tasks: [word_accuracy, phone_score, phone_mispron_t1.0]}}

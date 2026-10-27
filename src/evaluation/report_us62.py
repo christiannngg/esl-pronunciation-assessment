@@ -55,11 +55,13 @@ def job_diag(g) -> dict | None:
     norms, cos, w = np.asarray(g["hist_gnorm"], float), np.asarray(g["hist_gcos"], float), np.asarray(g["hist_w"], float)
     wt = gn[valid]
     share_ep = np.full(norms.shape, np.nan)
+    eff_ep = np.full(norms.shape, np.nan)
     for e in np.flatnonzero(valid):
         share_ep[e] = MT.grad_shares(norms[e])
+        eff_ep[e] = MT.grad_shares(w[e] * norms[e])                      # same averaging order as `shares` (per epoch, then over epochs), so equal weights give equal shares
     n = np.average(norms[valid], axis=0, weights=wt)
     return {"norms": n, "shares": np.average(share_ep[valid], axis=0, weights=wt), "cos": np.average(cos[valid], axis=0, weights=wt),
-            "eff_shares": MT.grad_shares(np.average(w[valid], axis=0, weights=wt) * n), "shares_epoch": share_ep}
+            "eff_shares": np.average(eff_ep[valid], axis=0, weights=wt), "shares_epoch": share_ep}
 
 
 def dominance_label(share: float, k: int, ratio: float) -> str:
