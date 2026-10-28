@@ -70,45 +70,45 @@ Declared: A candidate PASSES on validation if (1) the target head's validation F
 
 ## 3. What the schemes did to the loss weights and the gradient balance
 
-Weight = applied loss weight (sum 1; `fixed` = 1/K); share = share of the summed gradient norms on the last shared transformer layer. 'x balanced' = value x K.
+Weight = applied loss weight (sum 1; `fixed` = 1/K); unweighted share = share of the summed gradient norms of the UNWEIGHTED head losses on the last shared transformer layer (it does not change when a scheme changes the weights); effective share = the same with each norm multiplied by the applied weight, i.e. the balance the encoder actually receives. 'x balanced' = value x K.
 
-| candidate | head | weight (mean) x balanced | weight (last epoch) | gradient share x balanced |
-|---|---|---|---|---|
-| full | sent_accuracy | 1.000 | 0.143 | 0.576 |
-| full | sent_fluency | 1.000 | 0.143 | 1.775 |
-| full | sent_prosodic | 1.000 | 0.143 | 1.709 |
-| full | sent_total | 1.000 | 0.143 | 1.042 |
-| full | word_accuracy | 1.000 | 0.143 | 0.669 |
-| full | phone_score | 1.000 | 0.143 | 0.912 |
-| full | phone_mispron_t1.0 | 1.000 | 0.143 | 0.317 |
-| regroup | sent_accuracy | 1.000 | 0.250 | 0.563 |
-| regroup | sent_fluency | 1.000 | 0.250 | 1.215 |
-| regroup | sent_prosodic | 1.000 | 0.250 | 1.380 |
-| regroup | sent_total | 1.000 | 0.250 | 0.842 |
-| regroup | word_accuracy | 1.000 | 0.333 | 1.052 |
-| regroup | phone_score | 1.000 | 0.333 | 1.208 |
-| regroup | phone_mispron_t1.0 | 1.000 | 0.333 | 0.740 |
-| uncertainty | sent_accuracy | 0.891 | 0.128 | 0.475 |
-| uncertainty | sent_fluency | 0.886 | 0.127 | 2.025 |
-| uncertainty | sent_prosodic | 0.897 | 0.129 | 2.225 |
-| uncertainty | sent_total | 0.907 | 0.131 | 0.592 |
-| uncertainty | word_accuracy | 0.803 | 0.110 | 0.581 |
-| uncertainty | phone_score | 0.794 | 0.108 | 0.830 |
-| uncertainty | phone_mispron_t1.0 | 1.823 | 0.267 | 0.271 |
-| gradnorm_a05 | sent_accuracy | 1.197 | 0.233 | 0.573 |
-| gradnorm_a05 | sent_fluency | 0.285 | 0.027 | 1.818 |
-| gradnorm_a05 | sent_prosodic | 0.227 | 0.019 | 1.648 |
-| gradnorm_a05 | sent_total | 0.566 | 0.068 | 1.041 |
-| gradnorm_a05 | word_accuracy | 0.927 | 0.113 | 0.706 |
-| gradnorm_a05 | phone_score | 0.708 | 0.058 | 0.925 |
-| gradnorm_a05 | phone_mispron_t1.0 | 3.091 | 0.483 | 0.289 |
-| gradnorm_a15 | sent_accuracy | 1.165 | 0.269 | 0.485 |
-| gradnorm_a15 | sent_fluency | 0.304 | 0.048 | 1.872 |
-| gradnorm_a15 | sent_prosodic | 0.238 | 0.041 | 1.786 |
-| gradnorm_a15 | sent_total | 0.509 | 0.089 | 1.049 |
-| gradnorm_a15 | word_accuracy | 1.519 | 0.189 | 0.644 |
-| gradnorm_a15 | phone_score | 1.226 | 0.145 | 0.891 |
-| gradnorm_a15 | phone_mispron_t1.0 | 2.040 | 0.219 | 0.274 |
+| candidate | head | weight (mean) x balanced | weight (last epoch) | unweighted gradient share x balanced | effective share (weight x gradient norm) x balanced |
+|---|---|---|---|---|---|
+| full | sent_accuracy | 1.000 | 0.143 | 0.576 | 0.576 |
+| full | sent_fluency | 1.000 | 0.143 | 1.775 | 1.775 |
+| full | sent_prosodic | 1.000 | 0.143 | 1.709 | 1.709 |
+| full | sent_total | 1.000 | 0.143 | 1.042 | 1.042 |
+| full | word_accuracy | 1.000 | 0.143 | 0.669 | 0.669 |
+| full | phone_score | 1.000 | 0.143 | 0.912 | 0.912 |
+| full | phone_mispron_t1.0 | 1.000 | 0.143 | 0.317 | 0.317 |
+| regroup | sent_accuracy | 1.000 | 0.250 | 0.563 | 0.563 |
+| regroup | sent_fluency | 1.000 | 0.250 | 1.215 | 1.215 |
+| regroup | sent_prosodic | 1.000 | 0.250 | 1.380 | 1.380 |
+| regroup | sent_total | 1.000 | 0.250 | 0.842 | 0.842 |
+| regroup | word_accuracy | 1.000 | 0.333 | 1.052 | 1.052 |
+| regroup | phone_score | 1.000 | 0.333 | 1.208 | 1.208 |
+| regroup | phone_mispron_t1.0 | 1.000 | 0.333 | 0.740 | 0.740 |
+| uncertainty | sent_accuracy | 0.891 | 0.128 | 0.475 | 0.459 |
+| uncertainty | sent_fluency | 0.886 | 0.127 | 2.025 | 1.985 |
+| uncertainty | sent_prosodic | 0.897 | 0.129 | 2.225 | 2.208 |
+| uncertainty | sent_total | 0.907 | 0.131 | 0.592 | 0.581 |
+| uncertainty | word_accuracy | 0.803 | 0.110 | 0.581 | 0.515 |
+| uncertainty | phone_score | 0.794 | 0.108 | 0.830 | 0.726 |
+| uncertainty | phone_mispron_t1.0 | 1.823 | 0.267 | 0.271 | 0.526 |
+| gradnorm_a05 | sent_accuracy | 1.197 | 0.233 | 0.573 | 1.021 |
+| gradnorm_a05 | sent_fluency | 0.285 | 0.027 | 1.818 | 0.862 |
+| gradnorm_a05 | sent_prosodic | 0.227 | 0.019 | 1.648 | 0.789 |
+| gradnorm_a05 | sent_total | 0.566 | 0.068 | 1.041 | 0.846 |
+| gradnorm_a05 | word_accuracy | 0.927 | 0.113 | 0.706 | 1.034 |
+| gradnorm_a05 | phone_score | 0.708 | 0.058 | 0.925 | 1.069 |
+| gradnorm_a05 | phone_mispron_t1.0 | 3.091 | 0.483 | 0.289 | 1.379 |
+| gradnorm_a15 | sent_accuracy | 1.165 | 0.269 | 0.485 | 0.791 |
+| gradnorm_a15 | sent_fluency | 0.304 | 0.048 | 1.872 | 0.833 |
+| gradnorm_a15 | sent_prosodic | 0.238 | 0.041 | 1.786 | 0.816 |
+| gradnorm_a15 | sent_total | 0.509 | 0.089 | 1.049 | 0.685 |
+| gradnorm_a15 | word_accuracy | 1.519 | 0.189 | 0.644 | 1.408 |
+| gradnorm_a15 | phone_score | 1.226 | 0.145 | 0.891 | 1.611 |
+| gradnorm_a15 | phone_mispron_t1.0 | 2.040 | 0.219 | 0.274 | 0.856 |
 
 ## 4. One shared checkpoint (trigger for per-head checkpointing, plan item d)
 
