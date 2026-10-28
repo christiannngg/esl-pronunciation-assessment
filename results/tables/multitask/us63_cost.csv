@@ -1,0 +1,6 @@
+candidate,encoders,minutes_per_seed
+full,1,23.15261374447081
+regroup,2,18.945135105980768
+uncertainty,1,8.374036007457308
+gradnorm_a05,1,17.55727740923564
+gradnorm_a15,1,16.459996808899774
