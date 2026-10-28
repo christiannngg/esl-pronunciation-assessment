@@ -6,12 +6,12 @@
 
 SO762 only, recipe `base`, 3 seeds, same splits as US 6.1. Five candidates, each compared per head with the same-recipe single-task model (US 5.1 `base`) and with the full 7-head multi-task model (US 6.1):
 
-| candidate | change | encoders |
-|---|---|---|
-| `full` | 7 heads, fixed equal weights (US 6.1) | 1 |
-| `regroup` | sentence block (4 heads, new) + word / phone block (3 heads, US 6.2 `word_phone`) | 2 |
-| `uncertainty` | learned per-head log-variance weights | 1 |
-| `gradnorm_a05` / `gradnorm_a15` | GradNorm (first order, last-layer probe), alpha 0.5 / 1.5 | 1 |
+| candidate                       | change                                                                            | encoders |
+| ------------------------------- | --------------------------------------------------------------------------------- | -------- |
+| `full`                          | 7 heads, fixed equal weights (US 6.1)                                             | 1        |
+| `regroup`                       | sentence block (4 heads, new) + word / phone block (3 heads, US 6.2 `word_phone`) | 2        |
+| `uncertainty`                   | learned per-head log-variance weights                                             | 1        |
+| `gradnorm_a05` / `gradnorm_a15` | GradNorm (first order, last-layer probe), alpha 0.5 / 1.5                         | 1        |
 
 Not run, by decision: a loss that re-weights low scores (W8), a fix for `l2_phone_error` (M7, -0.005), per-head checkpointing (see section 4).
 
@@ -19,13 +19,13 @@ Not run, by decision: a loss that re-weights low scores (W8), a fix for `l2_phon
 
 Adoption is validation only: (1) the target head `phone_mispron_t1.0` is not worse than single-task by more than its margin, (2) no other head is, (3) the target head is at least as good as in the full model.
 
-| candidate | (1) target ok | (2) no other head worse | (3) target >= full | mean rel. val. error | passes |
-|---|---|---|---|---|---|
-| full | yes | **no** (sent_fluency, sent_prosodic, word_accuracy) | yes | 1.015 | no |
-| regroup | **no** (0.028 worse, margin 0.010) | **no** (sent_fluency, sent_prosodic) | **no** | 1.020 | no |
-| uncertainty | **no** (0.010 worse, margin 0.010) | **no** (4 heads) | **no** | 1.020 | no |
-| gradnorm_a05 | yes | **no** (the same three as `full`) | yes | 1.009 | no |
-| gradnorm_a15 | yes | **no** (the same three as `full`) | yes | **1.005** | no |
+| candidate    | (1) target ok                      | (2) no other head worse                             | (3) target >= full | mean rel. val. error | passes |
+| ------------ | ---------------------------------- | --------------------------------------------------- | ------------------ | -------------------- | ------ |
+| full         | yes                                | **no** (sent_fluency, sent_prosodic, word_accuracy) | yes                | 1.015                | no     |
+| regroup      | **no** (0.028 worse, margin 0.010) | **no** (sent_fluency, sent_prosodic)                | **no**             | 1.020                | no     |
+| uncertainty  | **no** (0.010 worse, margin 0.010) | **no** (4 heads)                                    | **no**             | 1.020                | no     |
+| gradnorm_a05 | yes                                | **no** (the same three as `full`)                   | yes                | 1.009                | no     |
+| gradnorm_a15 | yes                                | **no** (the same three as `full`)                   | yes                | **1.005**            | no     |
 
 Criterion (2) fails for every candidate, **including the full model, on the same three heads that are unchanged on test** (M8: 19 validation speakers). By the declared rule the outcome is "none adopted: report the full model and the per-level split side by side". This is the result of the rule and it is not relaxed here.
 
@@ -33,19 +33,28 @@ Criterion (2) fails for every candidate, **including the full model, on the same
 
 Target head `phone_mispron_t1.0`, test macro-F1 (single-task 0.680):
 
-| candidate | test F1 | vs single-task [95 % CI] | vs full MT | other heads worse than single-task on test |
-|---|---|---|---|---|
-| full | 0.654 | **-0.026 [-0.045, -0.009] worse** | - | 0 |
-| regroup | 0.686 | +0.007 [-0.009, 0.025] | +0.032 better | **4** (sent_fluency +0.047, sent_prosodic +0.037, sent_total +0.021, phone_score +0.004) |
-| uncertainty | 0.662 | **-0.018 [-0.035, -0.005] worse** | +0.007 better | 0 |
-| gradnorm_a05 | 0.683 | +0.003 [-0.008, 0.014] | +0.029 better | 0 (sent_total better by 0.022 [0.002, 0.044]) |
-| gradnorm_a15 | 0.681 | +0.001 [-0.012, 0.012] | +0.027 better | 0 |
+| candidate    | test F1 | vs single-task [95 % CI]          | vs full MT    | other heads worse than single-task on test                                               |
+| ------------ | ------- | --------------------------------- | ------------- | ---------------------------------------------------------------------------------------- |
+| full         | 0.654   | **-0.026 [-0.045, -0.009] worse** | -             | 0                                                                                        |
+| regroup      | 0.686   | +0.007 [-0.009, 0.025]            | +0.032 better | **4** (sent_fluency +0.047, sent_prosodic +0.037, sent_total +0.021, phone_score +0.004) |
+| uncertainty  | 0.662   | **-0.018 [-0.035, -0.005] worse** | +0.007 better | 0                                                                                        |
+| gradnorm_a05 | 0.683   | +0.003 [-0.008, 0.014]            | +0.029 better | 0 (sent_total better by 0.022 [0.002, 0.044])                                            |
+| gradnorm_a15 | 0.681   | +0.001 [-0.012, 0.012]            | +0.027 better | 0                                                                                        |
 
 - **regroup removes the loss and creates new ones.** The target head recovers (confirming the US 6.2 ablation), but three sentence heads and `phone_score` become significantly worse than single-task. The sentence block trained alone is worse than the same heads inside the full model (sent_fluency +0.030, sent_prosodic +0.026, sent_total +0.032 vs full), so the word / phone heads are not pure interference for the sentence heads. Two encoders, one weakness traded for four.
 - **uncertainty does not fix it.** Its learned weights barely left their starting point (target head 1.82x balanced against a start of 2.0x, the other heads 0.79-0.91x), so it is in effect the x2 re-weighting that US 6.2 already found insufficient. The prediction written down before the run (no help) held.
 - **GradNorm brings the target head back to the single-task level without a loss elsewhere.** Neither alpha leaves any head significantly worse than single-task on test. The target head is not better than single-task either: the CIs include 0 on both sides. The one significant gain (`gradnorm_a05`, sent_total) is one of 35 head-candidate comparisons without correction for multiplicity and is not read as positive transfer.
-- What GradNorm did to the weights (mean over the epochs after the head-only epoch, x balanced): `gradnorm_a05` target head 3.09, sent_fluency 0.29, sent_prosodic 0.23, sent_total 0.57, sent_accuracy 1.20, word_accuracy 0.93, phone_score 0.71; `gradnorm_a15` target head 2.04, word_accuracy 1.52, phone_score 1.23, sent_fluency 0.30, sent_prosodic 0.24. It moves weight from the two sentence heads that held the largest gradient shares (M2) to the starved target head, far more than the manual x3 of US 6.2 (which left the head at 0.653). That x3 did not help while GradNorm did suggests that **which** heads are down-weighted matters, not only the target head's own weight; this is a hypothesis, not tested (no ablation separates the two).
-- The effective share (weight x gradient norm) table in the revised report shows how balanced the encoder's gradient actually became. The first version of the report only showed the unweighted share, which cannot change when weights change; the column was added after the run and the report regenerated.
+- What GradNorm did to the weights (mean over the epochs after the head-only epoch, x balanced): `gradnorm_a05` target head 3.09, sent_fluency 0.29, sent_prosodic 0.23, sent_total 0.57, sent_accuracy 1.20, word_accuracy 0.93, phone_score 0.71; `gradnorm_a15` target head 2.04, word_accuracy 1.52, phone_score 1.23, sent_fluency 0.30, sent_prosodic 0.24. It moves weight from the two sentence heads that held the largest gradient shares (M2) to the starved target head, far more than the manual x3 of US 6.2 (which left the head at 0.653). That x3 did not help while GradNorm did suggests that **which** heads are down-weighted matters, not only the target head's own weight; this is a hypothesis, not tested (no ablation separates the two; see the effective-share table below).
+- **Did the encoder's gradient become balanced?** Effective share = applied weight x gradient norm on the last shared layer, x balanced (1.0 = equal; the column was added after the first version of the report, which only showed the unweighted share, and the report was regenerated):
+
+    | candidate    | sent_acc | sent_flu | sent_pros | sent_tot | word_acc | phone_score | **target head** | range     |
+    | ------------ | -------- | -------- | --------- | -------- | -------- | ----------- | --------------- | --------- |
+    | full         | 0.58     | 1.78     | 1.71      | 1.04     | 0.67     | 0.91        | **0.32**        | 0.32-1.78 |
+    | uncertainty  | 0.46     | 1.99     | 2.21      | 0.58     | 0.52     | 0.73        | **0.53**        | 0.46-2.21 |
+    | gradnorm_a05 | 1.02     | 0.86     | 0.79      | 0.85     | 1.03     | 1.07        | **1.38**        | 0.79-1.38 |
+    | gradnorm_a15 | 0.79     | 0.83     | 0.82      | 0.69     | 1.41     | 1.61        | **0.86**        | 0.69-1.61 |
+
+    `gradnorm_a05` is the most balanced (all heads within 0.79-1.38, the target head slightly over-weighted); `gradnorm_a15` pulls towards equal training rates and gives the word / phone heads more (1.41 / 1.61) while the target head sits just below balance (0.86). `uncertainty` leaves the two dominant sentence heads at about 2x. In both GradNorm runs the dominant sentence heads (fluency, prosodic) fall from about 1.75x to about 0.8x, the target head recovers, and the target head recovers whether it ends over-weighted (1.38) or just under balance (0.86). In `uncertainty` the dominant heads stay at about 2x and the target head stays significantly worse. That pattern across four candidates is consistent with the sentence heads' gradient dominance being the active ingredient, rather than the target head's own weight; four candidates with several things changing at once cannot prove it. These shares are means over epochs of per-epoch products (as in the US 6.2 diagnostics); the weights drift during training, so they are a summary, not a per-step balance.
 
 ## 4. Per-head checkpointing (plan item d)
 
@@ -53,13 +62,13 @@ Declared trigger: a head keeps regret >= 2 % after (a)-(c). Regret of the shared
 
 ## 5. Weakness -> fix, for the reviewer
 
-| weakness (memo s6) | outcome |
-|---|---|
+| weakness (memo s6)                                                                     | outcome                                                                                                                                                                                                                                                                                                                                         |
+| -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **M1** negative transfer from the sentence heads onto `phone_mispron_t1.0` (-0.026 F1) | **Removed by GradNorm** (test: +0.003 / +0.001 vs single-task, CIs include 0, both better than the full model by about 0.03) and by regrouping, but regrouping costs four heads. Uncertainty weighting does not remove it. **Not adopted under the declared validation rule** (criterion 2 fails for every candidate, the full model included). |
-| **M2 / M3** level imbalance; starved head that x3 did not repair | GradNorm re-weights the heads by a large factor and the target head recovers. Whether the effective gradient shares are balanced: see the effective-share table in the report. |
-| **M4** one shared stopping epoch | Smaller under GradNorm (regret 0.0-2.2 %); per-head checkpointing not implemented (section 4). |
-| **M7** `l2_phone_error` -0.005 | Not addressed, negligible. |
-| **W8** low-score compression (Sprint 5) | **Still open.** No loss that re-weights low scores was tried. |
+| **M2 / M3** level imbalance; starved head that x3 did not repair                       | **Addressed by GradNorm.** Effective gradient shares go from 0.32-1.78x balanced (full) to 0.79-1.38x (`gradnorm_a05`) and 0.69-1.61x (`gradnorm_a15`); the target head goes from 0.32x to 1.38x / 0.86x and recovers. Uncertainty weighting leaves the dominant sentence heads at about 2x (target head 0.53x) and does not recover it.        |
+| **M4** one shared stopping epoch                                                       | Smaller under GradNorm (regret 0.0-2.2 %); per-head checkpointing not implemented (section 4).                                                                                                                                                                                                                                                  |
+| **M7** `l2_phone_error` -0.005                                                         | Not addressed, negligible.                                                                                                                                                                                                                                                                                                                      |
+| **W8** low-score compression (Sprint 5)                                                | **Still open.** No loss that re-weights low scores was tried.                                                                                                                                                                                                                                                                                   |
 
 **Answer to the research question for the SO762 group.** With GradNorm the shared-encoder model matches the single-task models on all seven heads on test (no head significantly worse, no clear gain) with one encoder instead of seven. There is no evidence that joint learning improves the heads. The case for it is parity at a smaller model, not accuracy.
 

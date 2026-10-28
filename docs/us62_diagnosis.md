@@ -2,43 +2,43 @@
 
 **Status: the first diagnosis (`analyse`, no ablations) has been run; results are in `results/tables/multitask/us62_report.md` and summarised in the weakness memo. The ablations have not been run yet.**
 
-Research question 2 follow-up: *where does sharing the encoder help or hurt, and why?* US 6.1 found no significant gain on 8 of 9 heads and one significant loss (`phone_mispron_t1.0`, macro-F1 0.680 -> 0.654, CI [-0.045, -0.009]). US 6.2 looks for the reason.
+Research question 2 follow-up: _where does sharing the encoder help or hurt, and why?_ US 6.1 found no significant gain on 8 of 9 heads and one significant loss (`phone_mispron_t1.0`, macro-F1 0.680 -> 0.654, CI [-0.045, -0.009]). US 6.2 looks for the reason.
 
 ## 1. What is checked (task text -> diagnostic)
 
-| US 6.2 asks for | diagnostic | data it uses |
-|---|---|---|
-| per-task MT vs ST comparison | transfer table with the **matched** comparator (single-task model with the same recipe: `base` for `mt_base`, the US 5.3 `lr` model for `mt_lr`) | the US 6.1 headline csvs |
-| negative transfer / task imbalance | which heads are significantly worse; unit counts per head; progress of each head relative to its own head-only epoch ("lagging") | job files (`n_train`, `hist_val_primary`) and group file (`ref_err`) |
-| gradient dominance | each head's share of the summed gradient norms on the last shared transformer layer (1/K = balanced); labelled dominant / starved | group files (`hist_gnorm`, `hist_gn`) |
-| gradient conflict | mean gradient cosine per pair, fraction of jobs below the threshold; approximate cosine of each head with the sum of the others | group files (`hist_gcos`) |
-| the effect of the loss weighting | effective share (weight x norm); one ablation with a changed fixed weight (`w_mispron3`) | group files (`hist_w`); ablation jobs |
-| (added) one checkpoint for all heads | validation error at the shared checkpoint vs each head's own best epoch ("stopping compromise") | job files (`hist_val_primary`, `mt_head_best_epoch`) |
+| US 6.2 asks for                      | diagnostic                                                                                                                                       | data it uses                                                         |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| per-task MT vs ST comparison         | transfer table with the **matched** comparator (single-task model with the same recipe: `base` for `mt_base`, the US 5.3 `lr` model for `mt_lr`) | the US 6.1 headline csvs                                             |
+| negative transfer / task imbalance   | which heads are significantly worse; unit counts per head; progress of each head relative to its own head-only epoch ("lagging")                 | job files (`n_train`, `hist_val_primary`) and group file (`ref_err`) |
+| gradient dominance                   | each head's share of the summed gradient norms on the last shared transformer layer (1/K = balanced); labelled dominant / starved                | group files (`hist_gnorm`, `hist_gn`)                                |
+| gradient conflict                    | mean gradient cosine per pair, fraction of jobs below the threshold; approximate cosine of each head with the sum of the others                  | group files (`hist_gcos`)                                            |
+| the effect of the loss weighting     | effective share (weight x norm); one ablation with a changed fixed weight (`w_mispron3`)                                                         | group files (`hist_w`); ablation jobs                                |
+| (added) one checkpoint for all heads | validation error at the shared checkpoint vs each head's own best epoch ("stopping compromise")                                                  | job files (`hist_val_primary`, `mt_head_best_epoch`)                 |
 
 No new training is needed for the first run: the gradient diagnostics were logged during the US 6.1 jobs (every 25 optimiser steps after the head-only epoch).
 
 ## 2. Criteria, fixed before the gradient diagnostics were looked at (`configs/multitask.yaml` `compare62`)
 
-| name | rule |
-|---|---|
-| negative transfer | test verdict `worse` against the matched single-task model (paired speaker bootstrap, 95 % CI excludes 0) |
-| dominant / starved | gradient-norm share > 2/K, or < 1/(2K) |
-| conflict | mean gradient cosine < -0.1 in at least 67 % of the jobs (seeds x folds) |
-| aligned (reported only) | mean cosine > 0.3 |
-| stopping compromise | validation error at the shared checkpoint is at least 2 % above the head's own best epoch |
-| lagging | error / error(head-only epoch) at the shared checkpoint is worse than the head average by more than 0.02 |
+| name                    | rule                                                                                                      |
+| ----------------------- | --------------------------------------------------------------------------------------------------------- |
+| negative transfer       | test verdict `worse` against the matched single-task model (paired speaker bootstrap, 95 % CI excludes 0) |
+| dominant / starved      | gradient-norm share > 2/K, or < 1/(2K)                                                                    |
+| conflict                | mean gradient cosine < -0.1 in at least 67 % of the jobs (seeds x folds)                                  |
+| aligned (reported only) | mean cosine > 0.3                                                                                         |
+| stopping compromise     | validation error at the shared checkpoint is at least 2 % above the head's own best epoch                 |
+| lagging                 | error / error(head-only epoch) at the shared checkpoint is worse than the head average by more than 0.02  |
 
 What was seen before the criteria were set: the US 6.1 table. The suspicion that one stopping epoch is a compromise and that `phone_mispron_t1.0` is the problem head come from it, so they are **hypotheses**, not findings. The thresholds were chosen without any gradient number in view.
 
 ## 3. Ablations (GPU, SO762 only, recipe `base`, 3 seeds each)
 
-| variant | change | what a recovery would mean |
-|---|---|---|
-| `phone_pair` | only `phone_score` and `phone_mispron_t1.0` share the encoder | interference from the sentence / word heads |
-| `w_mispron3` | all 7 heads, `phone_mispron_t1.0` loss weighted x3 (then normalised to sum 1) | under-weighting of that head (task imbalance) |
+| variant      | change                                                                                                | what a recovery would mean                                                                                                                                                                                                                                                                                                                               |
+| ------------ | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `phone_pair` | only `phone_score` and `phone_mispron_t1.0` share the encoder                                         | interference from the sentence / word heads                                                                                                                                                                                                                                                                                                              |
+| `w_mispron3` | all 7 heads, `phone_mispron_t1.0` loss weighted x3 (then normalised to sum 1)                         | under-weighting of that head (task imbalance)                                                                                                                                                                                                                                                                                                            |
 | `word_phone` | only the word / phone block: `word_accuracy`, `phone_score`, `phone_mispron_t1.0` (no sentence heads) | the four sentence heads crowd out the word / phone level (they hold 73 % of the gradient norm and are mutually aligned). **Added after the first diagnosis**, motivated by the block structure of the cosines; it replaced `drop_wordacc`, which that diagnosis made unattractive (`word_accuracy` is not dominant and is aligned with both phone heads) |
 
-Reading rule (declared): an ablation **recovers** a negatively transferred head if the head is no longer significantly worse than its single-task comparator *and* significantly better than in the full multi-task model; **partly** if only the second holds; **no effect** / **hurts** otherwise. Ablations change the number of heads, hence the stopping criterion (mean over the heads present); that is part of the intervention and is not corrected.
+Reading rule (declared): an ablation **recovers** a negatively transferred head if the head is no longer significantly worse than its single-task comparator _and_ significantly better than in the full multi-task model; **partly** if only the second holds; **no effect** / **hurts** otherwise. Ablations change the number of heads, hence the stopping criterion (mean over the heads present); that is part of the intervention and is not corrected.
 
 ## 4. Order of use
 

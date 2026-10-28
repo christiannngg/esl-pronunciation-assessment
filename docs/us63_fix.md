@@ -4,23 +4,23 @@
 
 ## 1. What is fixed, and what is not
 
-| weakness (memo s6) | targeted by | status |
-|---|---|---|
-| M1 negative transfer of the sentence heads onto `phone_mispron_t1.0` (-0.026 F1) | regroup by level; uncertainty weights; GradNorm | **target** |
-| M2 / M3 level imbalance, starved head (x3 weight did not help) | same | **target** |
-| M4 one shared stopping epoch (at most a third of M1) | per-head checkpointing, **only if** a candidate keeps regret >= 2 % (section 4 of the report shows it) | conditional, not implemented |
-| M7 `l2_phone_error` -0.005 | nothing | negligible, reported; the L2 group is not rerun |
-| W8 low-score compression (Sprint 5) | nothing | **open**, reported as open |
+| weakness (memo s6)                                                               | targeted by                                                                                            | status                                          |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------- |
+| M1 negative transfer of the sentence heads onto `phone_mispron_t1.0` (-0.026 F1) | regroup by level; uncertainty weights; GradNorm                                                        | **target**                                      |
+| M2 / M3 level imbalance, starved head (x3 weight did not help)                   | same                                                                                                   | **target**                                      |
+| M4 one shared stopping epoch (at most a third of M1)                             | per-head checkpointing, **only if** a candidate keeps regret >= 2 % (section 4 of the report shows it) | conditional, not implemented                    |
+| M7 `l2_phone_error` -0.005                                                       | nothing                                                                                                | negligible, reported; the L2 group is not rerun |
+| W8 low-score compression (Sprint 5)                                              | nothing                                                                                                | **open**, reported as open                      |
 
 ## 2. Candidates (SO762, recipe `base`, 3 seeds, same splits as US 6.1)
 
-| name | what | encoders | tag | new jobs |
-|---|---|---|---|---|
-| `full` | 7 heads, fixed equal weights (US 6.1) | 1 | `mt_base` | no |
-| `regroup` | sentence block (4 heads) + word / phone block (3 heads) | 2 | `mt63_sent4` + `mt62_word_phone` | sentence block only |
-| `uncertainty` | 7 heads, learned per-head log-variance (Kendall et al. 2018) | 1 | `mt63_uncertainty` | yes |
-| `gradnorm_a05` | 7 heads, GradNorm, alpha 0.5 | 1 | `mt63_gradnorm_a05` | yes |
-| `gradnorm_a15` | 7 heads, GradNorm, alpha 1.5 | 1 | `mt63_gradnorm_a15` | yes |
+| name           | what                                                         | encoders | tag                              | new jobs            |
+| -------------- | ------------------------------------------------------------ | -------- | -------------------------------- | ------------------- |
+| `full`         | 7 heads, fixed equal weights (US 6.1)                        | 1        | `mt_base`                        | no                  |
+| `regroup`      | sentence block (4 heads) + word / phone block (3 heads)      | 2        | `mt63_sent4` + `mt62_word_phone` | sentence block only |
+| `uncertainty`  | 7 heads, learned per-head log-variance (Kendall et al. 2018) | 1        | `mt63_uncertainty`               | yes                 |
+| `gradnorm_a05` | 7 heads, GradNorm, alpha 0.5                                 | 1        | `mt63_gradnorm_a05`              | yes                 |
+| `gradnorm_a15` | 7 heads, GradNorm, alpha 1.5                                 | 1        | `mt63_gradnorm_a15`              | yes                 |
 
 Expectations written down before running: **regroup** is the likeliest winner (the US 6.2 ablations removed the loss when the sentence heads were removed). **uncertainty** and **GradNorm** are expected NOT to help: there is no gradient conflict, a x3 weight on the target head did not help, and uncertainty weighting gives more weight to heads whose training loss is low, which is the over-fit target head. They are run because the story names them and because a clean negative result is a result.
 
