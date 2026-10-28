@@ -157,7 +157,7 @@ def weights_table(c63: dict, registry: dict) -> pd.DataFrame:
             pcfg = MT.load_config(part["variant"])
             names = pcfg["groups"][c63["group"]]["tasks"]
             first = registry[names[0]]
-            W, L, S = [], [], []
+            W, L, S, E = [], [], [], []
             for fold in first.folds:
                 for seed in MT.seeds_for_group(pcfg, registry, c63["group"]):
                     gf = MT.group_file(pcfg, part["tag"], c63["group"], fold, seed)
@@ -168,13 +168,15 @@ def weights_table(c63: dict, registry: dict) -> pd.DataFrame:
                     W.append(w_mean); L.append(w_last)
                     d = R62.job_diag(g)
                     S.append(d["shares"] if d is not None else np.full(len(names), np.nan))
+                    E.append(d["eff_shares"] if d is not None else np.full(len(names), np.nan))
             if not W:
                 continue
             njobs = len(W)
-            W, L, S = np.mean(W, 0), np.mean(L, 0), np.nanmean(np.array(S), 0)
+            W, L, S, E = np.mean(W, 0), np.mean(L, 0), np.nanmean(np.array(S), 0), np.nanmean(np.array(E), 0)
             for k, n in enumerate(names):
                 rows.append({"candidate": cname, "tag": part["tag"], "task": n, "jobs": njobs, "weight_mean": float(W[k]),
-                             "weight_last": float(L[k]), "weight_x_balanced": float(W[k] * len(names)), "grad_share": float(S[k]), "grad_share_x_balanced": float(S[k] * len(names))})
+                             "weight_last": float(L[k]), "weight_x_balanced": float(W[k] * len(names)), "grad_share": float(S[k]), "grad_share_x_balanced": float(S[k] * len(names)),
+                             "eff_share": float(E[k]), "eff_share_x_balanced": float(E[k] * len(names))})
     return pd.DataFrame(rows)
 
 
@@ -245,9 +247,10 @@ def write_md(path, c63, heads, cands, adopted, why, weights, regret, cost) -> No
     L += ["", "`reading` (only meaningful for the target head): recovers = no longer worse than single-task AND better than the full model; partly = only the second; hurts / no effect otherwise.", ""]
     if len(weights):
         L += ["## 3. What the schemes did to the loss weights and the gradient balance", "",
-              "Weight = applied loss weight (sum 1; `fixed` = 1/K); share = share of the summed gradient norms on the last shared transformer layer. 'x balanced' = value x K.", ""]
+              "Weight = applied loss weight (sum 1; `fixed` = 1/K); unweighted share = share of the summed gradient norms of the UNWEIGHTED head losses on the last shared transformer layer (it does not change when a scheme changes the weights); effective share = the same with each norm multiplied by the applied weight, i.e. the balance the encoder actually receives. 'x balanced' = value x K.", ""]
         L += _t(weights, [("candidate", "candidate"), ("task", "head"), ("weight_x_balanced", "weight (mean) x balanced"), ("weight_last", "weight (last epoch)"),
-                          ("grad_share_x_balanced", "gradient share x balanced")])
+                          ("grad_share_x_balanced", "unweighted gradient share x balanced"),
+                          ("eff_share_x_balanced", "effective share (weight x gradient norm) x balanced")])
         L += [""]
     if len(regret):
         L += ["## 4. One shared checkpoint (trigger for per-head checkpointing, plan item d)", "",
