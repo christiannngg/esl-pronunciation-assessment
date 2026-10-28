@@ -27,7 +27,12 @@ train:
   loss:
     scheme: fixed                    # fixed (US 6.1) | uncertainty | gradnorm (US 6.3)
     weights: {}                      # head -> weight; missing = 1. Normalised to sum 1 so grad clipping and Adam see the same scale as a single-task job.
-    lr: 1.0e-3                       # learning rate of learnable loss weights (US 6.3); unused by `fixed`
+    lr: 1.0e-3                       # learning rate of the learnable log-variances of `uncertainty` (US 6.3); unused by `fixed` / `gradnorm`
+    alpha: 0.5                       # GradNorm restoring-force strength (US 6.3, variants gradnorm_a05 / gradnorm_a15); unused by the other schemes
+    lr_w: 0.025                      # GradNorm: Adam learning rate of the head weights (mean weight 1; the value of the GradNorm paper)
+    update_every: 1                  # GradNorm: update the weights every N optimiser steps after the head-only epoch (1 = every step; raise it if slow)
+    ema: 0.9                         # GradNorm: smoothing of the per-head training loss that enters the relative inverse training rate
+    w_min: 0.05                      # GradNorm: floor of a head weight before renormalising (mean weight 1)
   diag:                              # gradient diagnostics for US 6.2, written to <root>/<tag>/_group_<group>/
     every_steps: 25                  # every N optimiser steps (after the head-only epoch) compute each head's gradient on the probe parameters
     probe: top_layer                 # parameters of the last transformer layer that are trainable; the cheap, standard "last shared layer" probe
@@ -74,8 +79,51 @@ compare62:
     word_phone (word_accuracy + the two phone heads, no sentence heads) recovers -> the four sentence heads (73 % of the gradient norm, mutually aligned) crowd out the
     word / phone level. Added AFTER the first diagnosis (block structure of the gradient cosines); the thresholds above were not touched.
 
+# ---------------------------------------------------------------------------------------------------------------------------------------------------
+# US 6.3 fix protocol (src/evaluation/report_us63.py), fixed BEFORE any US 6.3 job was run. Plan: weakness_memo_s6 section 7 + the amendments of the review.
+# Weakness targeted: M1 (negative transfer of the sentence heads onto phone_mispron_t1.0) and M2/M3 (level imbalance, starved head). Not targeted: M7 (l2,
+# -0.005, negligible), W8 (low-score compression of word_accuracy / phone_score): reported as OPEN. The L2 group is not touched.
+# Order of events, stated honestly: the idea to regroup by level comes from the US 6.2 ablations, which were read on TEST (paired bootstrap). Adoption below is
+# decided on VALIDATION only, and regrouping gets no extra credit for having been seen first. GradNorm / uncertainty weighting are expected NOT to help
+# (no gradient conflict; x3 weight did not help; uncertainty weighting up-weights low-loss heads and the mispron head is the most over-fit) - written down
+# before running them so that a null result is a result, not a surprise.
+# ---------------------------------------------------------------------------------------------------------------------------------------------------
+compare63:
+  group: so762                       # the only group touched
+  target_head: phone_mispron_t1.0    # the head with negative transfer (M1)
+  comparator: base                   # matched single-task model: US 5.1 `base`, same recipe as the multi-task jobs (recipe `base`)
+  reference: {variant: null, tag: mt_base}   # the full 7-head model of US 6.1 (1 encoder)
+  tag_prefix: mt63_
+  margin_floor: 0.01                 # validation margin of a head: max(this, job-to-job sd of the single-task validation metric)  (as compare61 / diagnose53)
+  tie_margin: 0.01                   # candidates whose mean relative validation error is within this of the best are tied -> fewest encoders wins
+  n_boot: 500                        # paired speaker bootstrap on test (95 % CI), same rows / speakers / seeds for both systems
+  candidates:                        # name: encoders, and the jobs that make up the candidate (each part = one multi-task training run of a head subset)
+    full:         {encoders: 1, parts: [{variant: null,        tag: mt_base}]}
+    regroup:      {encoders: 2, parts: [{variant: sent4,       tag: mt63_sent4}, {variant: word_phone, tag: mt62_word_phone}]}
+    uncertainty:  {encoders: 1, parts: [{variant: uncertainty, tag: mt63_uncertainty}]}
+    gradnorm_a05: {encoders: 1, parts: [{variant: gradnorm_a05, tag: mt63_gradnorm_a05}]}
+    gradnorm_a15: {encoders: 1, parts: [{variant: gradnorm_a15, tag: mt63_gradnorm_a15}]}
+  adoption: >
+    A candidate PASSES on validation if (1) the target head's validation F1 is not worse than the single-task model's by more than its margin, AND (2) no
+    other head is worse than its single-task model by more than its margin (memo, section 7), AND (3) [secondary rule, added at the start of US 6.3 because
+    (1) is already met by the full model on validation: its target head is 0.007 worse against a margin of 0.010] the target head's validation F1 is at least
+    that of the full 7-head model. Among passing candidates the one with the lowest mean over heads of (candidate validation error / single-task validation
+    error) is adopted; candidates within tie_margin of it are tied and the one with the fewest encoders wins. If none passes: report the full model and the
+    per-level split side by side and state that sharing the encoder across levels does not help in this data. Test numbers are reported for every candidate
+    and never select. Every candidate is reported, not only the adopted one (winner's curse: five candidates are screened on 19 validation speakers).
+  per_head_checkpointing: only_if_a_head_keeps_regret_above_2_percent    # (d) of the plan; not implemented unless the candidates leave that regret
+
 variants:
-  # `lr` is inherited from finetune.yaml. US 6.3 adds the loss-weighting variants here.
+  # `lr` is inherited from finetune.yaml.
+  # ---- US 6.3: regrouping by level and loss-weighting schemes (SO762 only; recipe `base`, everything else as the full model) ----
+  sent4:                                                                      # the sentence block as its own model (the other half of `word_phone`)
+    groups: {so762: {tasks: [sent_accuracy, sent_fluency, sent_prosodic, sent_total]}}
+  uncertainty:                                                                # learned per-head log-variance (Kendall, Gal & Cipolla 2018), all seven heads
+    train: {loss: {scheme: uncertainty}}
+  gradnorm_a05:                                                               # GradNorm (Chen et al. 2018), restoring-force alpha 0.5, all seven heads
+    train: {loss: {scheme: gradnorm, alpha: 0.5}}
+  gradnorm_a15:                                                               # GradNorm, alpha 1.5 (stronger pull towards equal training rates)
+    train: {loss: {scheme: gradnorm, alpha: 1.5}}
   sharedalpha: {model: {alpha_mode: shared}}                                  # ablation: one layer-weighted sum for all heads
   # ---- US 6.2 ablations (SO762 only; the group's head list or the fixed loss weights change, everything else is the `base` recipe) ----
   phone_pair:                                                                 # only the two phone heads share the encoder

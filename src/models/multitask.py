@@ -18,7 +18,7 @@ What is identical to the single-task fine-tuning of Sprint 5 (src/models/finetun
   * per-head loss: MSE on the train-standardised target (regression) or balanced class-weighted cross-entropy (classification).
 What differs:
   * one forward pass of the encoder per utterance serves every head (sentence heads pool the whole utterance, word / phone heads pool MFA intervals);
-  * the heads' losses are combined (``LossWeighter``; US 6.1 = fixed, equal weights normalised to sum 1; US 6.3 adds uncertainty / GradNorm);
+  * the heads' losses are combined (``make_weighter``; US 6.1 = fixed, equal weights normalised to sum 1; US 6.3 adds `uncertainty` and `gradnorm`);
   * ONE checkpoint per multi-task job, picked on validation by ``train.stop_metric = mean_rel`` (see ``mean_rel``);
   * gradient diagnostics for US 6.2: every ``diag.every_steps`` optimiser steps, each head's gradient on the probe parameters (last transformer layer) is
     measured -> per-head gradient norm, its share of the total, and the cosine similarity between heads.
@@ -138,6 +138,7 @@ def grad_shares(norms: np.ndarray) -> np.ndarray:
 class FixedWeights:
     """total = sum_k w_k * loss_k with fixed w (normalised to sum 1). No parameters."""
     scheme = "fixed"
+    needs_grad_norms = False
 
     def __init__(self, names: list[str], weights: dict | None = None):
         self.names = list(names)
@@ -145,6 +146,16 @@ class FixedWeights:
 
     def parameters(self) -> list:
         return []
+
+    # the loop calls these on every weighter; only GradNorm does anything
+    def observe(self, losses: dict) -> None:
+        pass
+
+    def wants_norms(self, k: int) -> bool:
+        return False
+
+    def update(self, losses: dict, norms) -> None:
+        pass
 
     def combine(self, losses: dict):
         """-> (scalar total loss tensor, {head: float weight actually applied})."""
@@ -155,11 +166,123 @@ class FixedWeights:
         return total, dict(self.w)
 
 
-def make_weighter(lcfg: dict, names: list[str], kinds: dict[str, str]):
-    scheme = (lcfg or {}).get("scheme", "fixed")
+class UncertaintyWeights:
+    """Learned homoscedastic-uncertainty weights (Kendall, Gal & Cipolla 2018), US 6.3.
+
+    One learnable log-variance s_k per head (init 0). The weight of head k is c_k * exp(-s_k) with c = 1/2 for a regression head and 1 for a classification head;
+    s_k is trained on  sum_k [ c_k exp(-s_k) L_k + s_k / 2 ]  (the L_k are detached there, so that term only moves s). The shared encoder and the heads receive
+    the SAME combination normalised to sum 1 (detached), exactly as `fixed`, so the gradient clip and Adam see the scale of a single-task job and only the
+    RELATIVE weights are learned. A head whose training loss stays high gets a large variance and a small weight; a head that fits its training data
+    (loss -> 0) gets a large weight. s is clipped to [-S_CLIP, S_CLIP] inside the weights.
+    """
+    scheme = "uncertainty"
+    needs_grad_norms = False
+    S_CLIP = 5.0
+
+    def __init__(self, names: list[str], kinds: dict, device=None):
+        torch = FT._torch()
+        self.names = list(names)
+        self.c = torch.tensor([0.5 if kinds.get(n, "reg") == "reg" else 1.0 for n in self.names], dtype=torch.float32, device=device)
+        self.s = torch.nn.Parameter(torch.zeros(len(self.names), dtype=torch.float32, device=device))
+
+    def parameters(self) -> list:
+        return [self.s]
+
+    def observe(self, losses: dict) -> None:
+        pass
+
+    def wants_norms(self, k: int) -> bool:
+        return False
+
+    def update(self, losses: dict, norms) -> None:
+        pass
+
+    def combine(self, losses: dict):
+        torch = FT._torch()
+        s = self.s.clamp(-self.S_CLIP, self.S_CLIP)
+        raw = self.c * torch.exp(-s)
+        wn = (raw / raw.sum()).detach()
+        L = torch.stack([losses[n] for n in self.names])
+        total = (wn * L).sum() + (raw * L.detach()).sum() + 0.5 * s.sum()
+        return total, {n: float(wn[i]) for i, n in enumerate(self.names)}
+
+
+class GradNormWeights:
+    """GradNorm (Chen et al. 2018), US 6.3, first-order form, numpy state. No learnable parameters in the graph.
+
+    Weights w_k (mean 1, floor w_min) move so that each head's weighted gradient norm  G_k = w_k * ||grad_W L_k||  (W = the probe parameters, the last
+    trainable transformer layer, as in the US 6.2 diagnostics) approaches  mean(G) * r_k**alpha,  where r_k is the head's relative inverse training rate,
+    (L_k / L0_k) / mean_j(L_j / L0_j). L is an exponential moving average of the head's training loss, L0 its mean over the second half of the head-only
+    epoch. The weights are updated by Adam (lr_w) on the GradNorm L1 loss with the targets held constant (the gradient w.r.t. w_k is sign(G_k - target_k) *
+    ||grad_W L_k||), then floored and renormalised to mean 1. The model receives w / K (sum 1), as in `fixed`.
+    """
+    scheme = "gradnorm"
+    needs_grad_norms = True
+
+    def __init__(self, names: list[str], alpha: float = 0.5, lr: float = 0.025, update_every: int = 1, ema: float = 0.9, w_min: float = 0.05):
+        self.names = list(names)
+        self.K = len(self.names)
+        self.alpha, self.lr, self.every, self.ema, self.w_min = float(alpha), float(lr), max(int(update_every), 1), float(ema), float(w_min)
+        self.w = np.ones(self.K)
+        self.L0 = None
+        self.Lema = None
+        self._warm: list[np.ndarray] = []
+        self._m, self._v, self._t = np.zeros(self.K), np.zeros(self.K), 0
+
+    def parameters(self) -> list:
+        return []
+
+    def observe(self, losses: dict) -> None:
+        """Called every step with the unweighted head losses: collects the head-only reference, then smooths the loss."""
+        vals = np.array([float(losses[n].detach()) for n in self.names])
+        if self.L0 is None:
+            self._warm.append(vals)
+        else:
+            self.Lema = self.ema * self.Lema + (1.0 - self.ema) * vals
+
+    def wants_norms(self, k: int) -> bool:
+        return k % self.every == 0
+
+    def update(self, losses: dict, norms) -> dict:
+        """norms: per-head gradient norm on the probe parameters of the UNWEIGHTED head losses. -> {'G': ..., 'target': ...} (diagnostic)."""
+        norms = np.asarray(norms, float)
+        if self.L0 is None:                                              # first update = first step with the encoder training
+            warm = np.array(self._warm)
+            self.L0 = np.maximum(warm[len(warm) // 2:].mean(0), 1e-8)
+            self.Lema = warm[-1].copy()
+        r = np.maximum(self.Lema / self.L0, 1e-8)
+        r = r / r.mean()
+        G = self.w * norms
+        target = G.mean() * r ** self.alpha
+        grad = np.sign(G - target) * norms
+        self._t += 1
+        self._m = 0.9 * self._m + 0.1 * grad
+        self._v = 0.999 * self._v + 0.001 * grad ** 2
+        step = (self._m / (1 - 0.9 ** self._t)) / (np.sqrt(self._v / (1 - 0.999 ** self._t)) + 1e-8)
+        w = np.maximum(self.w - self.lr * step, self.w_min)
+        self.w = w * (self.K / w.sum())
+        return {"G": G, "target": target}
+
+    def combine(self, losses: dict):
+        wn = self.w / self.K
+        total = None
+        for i, n in enumerate(self.names):
+            term = float(wn[i]) * losses[n]
+            total = term if total is None else total + term
+        return total, {n: float(wn[i]) for i, n in enumerate(self.names)}
+
+
+def make_weighter(lcfg: dict, names: list[str], kinds: dict[str, str], device=None):
+    lcfg = lcfg or {}
+    scheme = lcfg.get("scheme", "fixed")
     if scheme == "fixed":
-        return FixedWeights(names, (lcfg or {}).get("weights"))
-    raise NotImplementedError(f"loss scheme {scheme!r} is added in US 6.3; US 6.1 uses 'fixed'")
+        return FixedWeights(names, lcfg.get("weights"))
+    if scheme == "uncertainty":
+        return UncertaintyWeights(names, kinds, device)
+    if scheme == "gradnorm":
+        return GradNormWeights(names, alpha=float(lcfg.get("alpha", 0.5)), lr=float(lcfg.get("lr_w", 0.025)), update_every=int(lcfg.get("update_every", 1)),
+                               ema=float(lcfg.get("ema", 0.9)), w_min=float(lcfg.get("w_min", 0.05)))
+    raise ValueError(f"unknown loss scheme {scheme!r} (fixed | uncertainty | gradnorm)")
 
 
 # --------------------------------------------------------------------------- #
@@ -417,10 +540,13 @@ def run_group(group: str, md: MTData, enc_cache: dict, cfg: dict, tag: str, fold
     specs = [{"name": n, "table": tasks[n].table, "pool_kind": md.td[n].pool_kind, "d_side": md.td[n].side.shape[1], "d_out": 1 if st[n]["reg"] else st[n]["K"]}
              for n in names]
     model = Model(enc, layers, specs, mcfg["head"], int(mcfg["hidden"]), float(mcfg["head_dropout"]), mcfg.get("alpha_mode", "per_head")).to(dev)
-    weighter = make_weighter(tcfg.get("loss"), names, {n: tasks[n].kind for n in names})
+    weighter = make_weighter(tcfg.get("loss"), names, {n: tasks[n].kind for n in names}, device=dev)
     opt = torch.optim.AdamW(param_groups_mt(model, tcfg, weighter.parameters()))
-    probe = probe_parameters(model) if (tcfg.get("diag") or {}).get("probe") == "top_layer" else []
-    diag_every = int((tcfg.get("diag") or {}).get("every_steps", 0)) if probe else 0
+    diag_on = (tcfg.get("diag") or {}).get("probe") == "top_layer"
+    probe = probe_parameters(model) if (diag_on or weighter.needs_grad_norms) else []     # GradNorm needs the probe even when the US 6.2 diagnostics are off
+    diag_every = int((tcfg.get("diag") or {}).get("every_steps", 0)) if (probe and diag_on) else 0
+    if weighter.needs_grad_norms and not probe:
+        raise ValueError(f"loss scheme {weighter.scheme!r} needs the gradient probe, but the encoder has no trainable transformer layer (check train.freeze_layers)")
     rng = np.random.default_rng(seed)
     aug, aug_rng = tcfg.get("augment") or {}, np.random.default_rng(seed + 1000)
     max_s, tol = int(tcfg["max_batch_seconds"] * SR), float(tcfg["pad_tolerance"])
@@ -482,9 +608,16 @@ def run_group(group: str, md: MTData, enc_cache: dict, cfg: dict, tag: str, fold
             x, lens, spans, rows, side, ys = collate_mt(md, tr_u[bidx], dev, side_t, yt, aug, aug_rng)
             outs = model(x, lens, spans, side, amp)
             losses = {n: lossf(n, outs[n], ys[n]) for n in names}
+            weighter.observe(losses)
+            k_enc = step - freeze
+            is_diag = bool(diag_every and model.train_encoder and k_enc % diag_every == 0)
+            is_upd = bool(weighter.needs_grad_norms and probe and model.train_encoder and weighter.wants_norms(k_enc))
+            G = head_gram(losses, names, probe) if (is_diag or is_upd) else None      # before any backward of the combined loss
+            if is_diag:
+                grams.append(G)
+            if is_upd:
+                weighter.update(losses, cosine_from_gram(G)[0])
             loss, w = weighter.combine(losses)
-            if diag_every and model.train_encoder and (step - freeze) % diag_every == 0:
-                grams.append(head_gram(losses, names, probe))
             opt.zero_grad(set_to_none=True)
             loss.backward()
             if tcfg.get("grad_clip"):

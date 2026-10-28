@@ -46,7 +46,7 @@ def test_cosine_from_gram_matches_vectors_and_handles_zero_gradient():
     np.testing.assert_allclose(mt.grad_shares(np.zeros(3)), np.full(3, 1 / 3))
 
 
-def test_fixed_weighter_is_the_weighted_sum_and_future_schemes_are_refused_for_now():
+def test_fixed_weighter_is_the_weighted_sum_and_unknown_schemes_are_refused():
     torch = pytest.importorskip("torch")
     names = ["a", "b"]
     wt = mt.make_weighter({"scheme": "fixed", "weights": {"a": 1.0, "b": 3.0}}, names, {"a": "reg", "b": "clf"})
@@ -55,8 +55,8 @@ def test_fixed_weighter_is_the_weighted_sum_and_future_schemes_are_refused_for_n
     assert float(total.detach()) == pytest.approx(0.25 * 2.0 + 0.75 * 4.0) and w == {"a": 0.25, "b": 0.75} and wt.parameters() == []
     eq, _ = mt.make_weighter({"scheme": "fixed"}, names, {}).combine(losses)
     assert float(eq.detach()) == pytest.approx(3.0)                                          # equal weights = mean of the losses
-    with pytest.raises(NotImplementedError):
-        mt.make_weighter({"scheme": "gradnorm"}, names, {})
+    with pytest.raises(ValueError):
+        mt.make_weighter({"scheme": "nope"}, names, {})                                     # `uncertainty` and `gradnorm` exist since US 6.3 (tests/test_us63.py)
 
 
 # ---- configuration ----------------------------------------------------------- #
