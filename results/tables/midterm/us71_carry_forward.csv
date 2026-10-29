@@ -1,0 +1,10 @@
+task,group,margin,val_leader,tied_with_leader,single_task_ref,test_leader,validation_test_disagree,ineligible,carried
+sent_accuracy,so762,0.0108100547945482,MT-GN15,MT-GN15,FT-base,MT-GN15,False,FT-stab,"FT-base, MT-GN15, MT-full (reference)"
+sent_fluency,so762,0.01,FT-base,"FT-base, FT-stab",FT-base,FT-stab,False,,"FT-base, MT-GN15, MT-full (reference)"
+sent_prosodic,so762,0.018477345689516,FT-base,"FT-base, FT-stab",FT-base,FT-base,False,,"FT-base, MT-GN15, MT-full (reference)"
+sent_total,so762,0.01,MT-GN15,MT-GN15,FT-stab,MT-full,True,,"FT-stab, MT-GN15, MT-full (reference)"
+word_accuracy,so762,0.0214547256767205,FT-base,"FT-base, FT-stab",FT-base,MT-full,True,,"FT-base, MT-GN15, MT-full (reference)"
+phone_score,so762,0.01,MT-full,"FT-base, FT-stab, MT-full, MT-GN15",FT-base,MT-full,False,,"FT-base, MT-GN15, MT-full (reference)"
+phone_mispron_t1.0,so762,0.01,MT-GN15,"FT-base, FT-stab, MT-GN15",FT-base,MT-GN15,False,MT-full,"FT-base, MT-GN15, MT-full (reference)"
+l2_phone_error,l2,0.01,MT-full,"FT-stab, MT-full",FT-stab,MT-full,False,,"FT-stab, MT-full"
+l2_word_error,l2,0.01,MT-full,"FT-base, FT-stab, MT-full",FT-base,FT-base,False,,"FT-stab, MT-full"
