@@ -1,0 +1,13 @@
+task,group,n_items,human_loo_r
+sent_accuracy,adult,1220,0.8044561328098501
+sent_accuracy,child/teen,1280,0.5970420141939133
+sent_fluency,adult,1220,0.8276325136152745
+sent_fluency,child/teen,1280,0.6770994255574169
+sent_prosodic,adult,1220,0.8080654402137641
+sent_prosodic,child/teen,1280,0.6690652548415041
+sent_total,adult,1220,0.8351816663392786
+sent_total,child/teen,1280,0.6804731215913495
+word_accuracy,adult,8701,0.7400758477310788
+word_accuracy,child/teen,7266,0.6369090332432622
+phone_score,adult,25752,0.7092959082681896
+phone_score,child/teen,21617,0.6195742617723976

@@ -47,6 +47,9 @@ COMPUTED = R71.TABLES / "midterm" / "us71_pairs_computed.csv"
 WANTED = [("B", "FT-base", R71.TASKS), ("B", "MT-GN15", R71.SO762), ("F", "MT-GN15", R71.SO762)]
 SYSTEM_TASKS = {"B": R71.TASKS, "F": R71.TASKS, "FT-base": R71.TASKS, "MT-GN15": R71.SO762, "FT-stab": R71.TASKS, "MT-full": R71.TASKS}
 TOL = 1e-4
+PROBA_DIR = R71.REPO / "results" / "analysis" / "us82"
+PROBA_TASKS: set[str] = set()          # filled by `export --proba`: tasks whose positive-class probability is saved next to the bundle
+PROBA_ONLY = False                     # `export --proba-only`: do not rewrite the hard-prediction bundles
 
 
 # --------------------------------------------------------------------------- #
@@ -128,7 +131,19 @@ def _expected() -> dict[tuple[str, str], float]:
     return {(r.system, r.task): float(r.test) for r in long.itertuples()}
 
 
+def save_proba(system: str, task: str, y, proba, speaker) -> Path:
+    """Positive-class probability on the test rows, in bundle order: results/analysis/us82/<system>__<task>.npz (y, proba, speaker)."""
+    p = PROBA_DIR / f"{system}__{task}.npz"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    proba = np.asarray(proba, float)
+    np.savez_compressed(p, y=np.asarray(y), proba=proba[:, 1] if proba.ndim == 2 else proba, speaker=np.asarray(speaker).astype(str))
+    print(f"[us71-pairs] {system}/{task}: probabilities written ({len(proba)} rows)")
+    return p
+
+
 def _save_checked(system, task, y, pred, speaker, expected, force) -> bool:
+    if PROBA_ONLY:
+        return True
     b = {"y": np.asarray(y), "pred": np.asarray(pred), "speaker": np.asarray(speaker).astype(str)}
     got, want = score_bundle(task, b), expected.get((system, task))
     if want is not None and abs(got - want) > TOL and not force:
@@ -193,6 +208,19 @@ def _export_ft(system, tag_of, tasks, registry, expected, force):
         y_all, meta = FH.load_labels(task)
         s = R61.build_system(task, jobs, y_all, meta, 20, seed)["sys"]
         _save_checked(system, t, RF._enc(task, s["y"]), RF._enc(task, s["pred"]), s["meta"]["speaker"].to_numpy(), expected, force)
+        _maybe_proba(system, t, task, jobs, y_all, meta, s)
+
+
+def _maybe_proba(system, t, task, jobs, y_all, meta, s) -> None:
+    """Same seed-averaged probabilities that the headline decision rule used (report_us51.pooled_ft), checked to sit on the same rows."""
+    if t not in PROBA_TASKS:
+        return
+    from src.evaluation import report_frozen as RF
+    from src.evaluation import report_us51 as R51
+
+    d = R51.pooled_ft(task, jobs, y_all, meta)["test"]
+    assert np.array_equal(RF._enc(task, d["y"]), RF._enc(task, s["y"])) and np.array_equal(d["meta"]["speaker"].to_numpy(), s["meta"]["speaker"].to_numpy()), "probability rows differ from the bundle rows"
+    save_proba(system, t, RF._enc(task, d["y"]), d["proba"], d["meta"]["speaker"].to_numpy())
 
 
 def export_FT(tasks, registry, expected, force):
@@ -229,6 +257,7 @@ def _export_mt(system, srcs, seeds_of, tasks, registry, expected, force):
         y_all, meta = FH.load_labels(task)
         s = R61.build_system(task, jobs, y_all, meta, 20, seed)["sys"]
         _save_checked(system, t, RF._enc(task, s["y"]), RF._enc(task, s["pred"]), s["meta"]["speaker"].to_numpy(), expected, force)
+        _maybe_proba(system, t, task, jobs, y_all, meta, s)
 
 
 def export_GN15(tasks, registry, expected, force):
@@ -265,6 +294,8 @@ def main(argv=None) -> None:
     ex = sub.add_parser("export", help="write the prediction bundles this machine can build")
     ex.add_argument("--systems", nargs="*", default=list(EXPORTERS), choices=list(EXPORTERS))
     ex.add_argument("--force", action="store_true", help="write a bundle even when its metric differs from the saved table")
+    ex.add_argument("--proba", action="store_true", help="also save the positive-class probabilities of phone_mispron_t1.0 (US 8.2) to results/analysis/us82/")
+    ex.add_argument("--proba-only", action="store_true", help="like --proba, without rewriting the hard-prediction bundles")
     pr = sub.add_parser("pairs", help="compute the paired comparisons from the bundles that exist")
     pr.add_argument("--n-boot", type=int, default=None)
     a = ap.parse_args(argv)
@@ -273,6 +304,10 @@ def main(argv=None) -> None:
         from src.models.baselines import build_tasks, load_config
         registry = build_tasks(load_config())
         expected = _expected()
+        if a.proba or a.proba_only:
+            PROBA_TASKS.add("phone_mispron_t1.0")
+        if a.proba_only:
+            globals()["PROBA_ONLY"] = True
         for s in a.systems:
             EXPORTERS[s](SYSTEM_TASKS[s], registry, expected, a.force)
         print("[us71-pairs] bundles now present: " + ", ".join(sorted(p.stem for p in BUNDLES.glob("*.npz"))))

@@ -195,9 +195,11 @@ def check_bundle(task: str, frame: pd.DataFrame, b: dict) -> None:
 # --------------------------------------------------------------------------- #
 # metrics from per-speaker sufficient statistics (so a bootstrap draw is one matrix product)
 # --------------------------------------------------------------------------- #
-def reg_stats(y, p, codes, n_spk) -> np.ndarray:
+def reg_stats(y, p, codes, n_spk, wt=None) -> np.ndarray:
+    """Per-speaker sums n, sy, sp, syy, spp, syp; ``wt`` (frequency weights per row) turns them into weighted sums, the metrics formulas are unchanged."""
     y, p = np.asarray(y, float), np.asarray(p, float)
-    cols = [np.ones_like(y), y, p, y * y, p * p, y * p]
+    w = np.ones_like(y) if wt is None else np.asarray(wt, float)
+    cols = [w, w * y, w * p, w * y * y, w * p * p, w * y * p]
     return np.stack([np.bincount(codes, weights=c, minlength=n_spk) for c in cols], axis=1)
 
 
@@ -253,13 +255,13 @@ class Cell:
         self.task, self.y, self.p = task, np.asarray(y), np.asarray(pred)
         _, self.codes = np.unique(np.asarray(speaker).astype(str), return_inverse=True)
 
-    def stats(self, mask: np.ndarray) -> np.ndarray:
+    def stats(self, mask: np.ndarray, wt=None) -> np.ndarray:
         """Per-speaker statistics of the masked rows (speakers without a row in the mask are dropped), in sorted speaker order."""
         _, inv = np.unique(self.codes[mask], return_inverse=True)
         n = int(inv.max()) + 1 if len(inv) else 0
         if self.task in N_CLASSES:
             return clf_stats(self.y[mask], self.p[mask], inv, n, N_CLASSES[self.task])
-        return reg_stats(self.y[mask], self.p[mask], inv, n)
+        return reg_stats(self.y[mask], self.p[mask], inv, n, None if wt is None else np.asarray(wt)[mask])
 
 
 # --------------------------------------------------------------------------- #
