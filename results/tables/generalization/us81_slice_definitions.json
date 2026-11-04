@@ -1,0 +1,95 @@
+{
+  "length": "terciles of utterance duration over the unique test utterances of each dataset (cuts per task below)",
+  "proficiency": "terciles of test speakers: SO762 by mean human sentence accuracy, L2-ARCTIC by minus the phone error rate (label-derived proxy, descriptive only)",
+  "score_bin": {
+    "sentence": {
+      "edges": [
+        6.5,
+        8.5
+      ],
+      "labels": [
+        "<=6",
+        "7-8",
+        "9-10"
+      ]
+    },
+    "word_accuracy": {
+      "edges": [
+        4.5,
+        9.5
+      ],
+      "labels": [
+        "0-4",
+        "5-9",
+        "10"
+      ]
+    },
+    "phone_score": {
+      "edges": [
+        0.99,
+        1.99
+      ],
+      "labels": [
+        "<1.0",
+        "1.0-1.9",
+        "2.0"
+      ]
+    }
+  },
+  "tasks": {
+    "sent_accuracy": {
+      "length_cuts": [
+        3.140000104904175,
+        4.010000228881836
+      ]
+    },
+    "sent_fluency": {
+      "length_cuts": [
+        3.140000104904175,
+        4.010000228881836
+      ]
+    },
+    "sent_prosodic": {
+      "length_cuts": [
+        3.140000104904175,
+        4.010000228881836
+      ]
+    },
+    "sent_total": {
+      "length_cuts": [
+        3.140000104904175,
+        4.010000228881836
+      ]
+    },
+    "word_accuracy": {
+      "length_cuts": [
+        3.140000104904175,
+        4.010000228881836
+      ]
+    },
+    "phone_score": {
+      "length_cuts": [
+        3.140000104904175,
+        4.010000228881836
+      ]
+    },
+    "phone_mispron_t1.0": {
+      "length_cuts": [
+        3.140000104904175,
+        4.010000228881836
+      ]
+    },
+    "l2_phone_error": {
+      "length_cuts": [
+        2.7999999999999985,
+        3.649999999999998
+      ]
+    },
+    "l2_word_error": {
+      "length_cuts": [
+        2.7999999999999985,
+        3.649999999999998
+      ]
+    }
+  }
+}

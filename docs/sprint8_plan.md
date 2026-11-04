@@ -81,4 +81,6 @@ If the CV grid slips, the freeze can move by up to two days: the Sprint 9 app on
 
 ## 9. Changes after this date
 
-(none yet)
+- **2026-11-03, AUC / AP moved to US 8.2.** The prediction bundles hold hard predictions only, so the threshold-free diagnostics of check 2 cannot be computed from them. US 8.2 needs the export extended to save probabilities for `phone_mispron_t1.0` (and the other classification heads if wanted). The US 8.1 tables report recall, precision and positive rate instead.
+- **2026-11-03, bootstrap implementation.** The 8.1 tables use per-speaker sufficient statistics (`src/evaluation/report_us81.py`) with the same conventions as `metrics.paired_speaker_bootstrap` (speaker resampling, percentile CI, p = 2 min(P(d <= 0), P(d >= 0)), 500 draws, seed from `configs/baseline.yaml`) but a different random stream. US 7.1 intervals are unchanged. The overall metrics are checked against the US 7.1 table before any file is written.
+- **2026-11-03, result of Family A, recorded without changing the rule.** Only `phone_mispron_t1.0` has a Holm-significant adverse gap. The regression heads show strong child/teen compression (slope, PCC) that the pre-declared RMSE family does not detect; whether to add them as targets is an open decision (`docs/generalization_report.md`, section 5). Until decided, the target rule in section 4 stands.
