@@ -17,6 +17,9 @@ Two steps, so that each machine only needs the files it has. Both only READ exis
          F        needs experiments/results/frozen43 (+ the fix outputs) as report_us51.frozen_refs does
          FT-base  needs experiments/results/finetune/base           (lab machine)
          MT-GN15  needs experiments/results/multitask/mt63_gradnorm_a15  (lab machine)
+         FT-stab  needs the tag per task in results/tables/finetune/us53_selection.csv under experiments/results/finetune  (lab machine; Sprint 8 add-on)
+         MT-full  needs experiments/results/multitask/mt_base (SO762 heads) and mt_lr (L2 heads)  (lab machine; Sprint 8 add-on)
+     FT-stab and MT-full are exported for the Sprint 8 subgroup analysis only; WANTED (the US 7.1 pairs) is unchanged.
      Copy / commit the small npz files so that all bundles end up in one checkout.
 
   2. pairs (anywhere, numpy only):
@@ -42,7 +45,7 @@ from src.evaluation import report_us71 as R71
 BUNDLES = R71.REPO / "results" / "analysis" / "us71"
 COMPUTED = R71.TABLES / "midterm" / "us71_pairs_computed.csv"
 WANTED = [("B", "FT-base", R71.TASKS), ("B", "MT-GN15", R71.SO762), ("F", "MT-GN15", R71.SO762)]
-SYSTEM_TASKS = {"B": R71.TASKS, "F": R71.TASKS, "FT-base": R71.TASKS, "MT-GN15": R71.SO762}
+SYSTEM_TASKS = {"B": R71.TASKS, "F": R71.TASKS, "FT-base": R71.TASKS, "MT-GN15": R71.SO762, "FT-stab": R71.TASKS, "MT-full": R71.TASKS}
 TOL = 1e-4
 
 
@@ -173,7 +176,7 @@ def export_F(tasks, registry, expected, force):
         _save_checked("F", t, RF._enc(registry[t], s["y"]), RF._enc(registry[t], s["pred"]), s["meta"]["speaker"].to_numpy(), expected, force)
 
 
-def export_FT(tasks, registry, expected, force):
+def _export_ft(system, tag_of, tasks, registry, expected, force):
     from src.evaluation import report_frozen as RF
     from src.evaluation import report_us61 as R61
     from src.models import finetune as FT
@@ -182,44 +185,78 @@ def export_FT(tasks, registry, expected, force):
 
     cfg, seed = FT.load_config(), load_baseline_config()["bootstrap"]["seed"]
     for t in tasks:
-        task = registry[t]
-        jobs = R61.load_sources([(cfg, "base")], task, FT.seeds_for(task, cfg, None))
+        task, tag = registry[t], tag_of(t)
+        jobs = R61.load_sources([(cfg, tag)], task, FT.seeds_for(task, cfg, None))
         if jobs is None:
-            print(f"[us71-pairs] FT-base/{t}: no finished jobs under tag 'base' on this machine; skipped")
+            print(f"[us71-pairs] {system}/{t}: no finished jobs under tag {tag!r} on this machine; skipped")
             continue
         y_all, meta = FH.load_labels(task)
         s = R61.build_system(task, jobs, y_all, meta, 20, seed)["sys"]
-        _save_checked("FT-base", t, RF._enc(task, s["y"]), RF._enc(task, s["pred"]), s["meta"]["speaker"].to_numpy(), expected, force)
+        _save_checked(system, t, RF._enc(task, s["y"]), RF._enc(task, s["pred"]), s["meta"]["speaker"].to_numpy(), expected, force)
 
 
-def export_GN15(tasks, registry, expected, force):
+def export_FT(tasks, registry, expected, force):
+    _export_ft("FT-base", lambda t: "base", tasks, registry, expected, force)
+
+
+def export_FTstab(tasks, registry, expected, force):
+    """US 5.3 stabilized set: the variant tag per task comes from the selection file (tasks that kept `base` reuse the base jobs)."""
+    from src.evaluation import report_us61 as R61
+
+    stab = R61.stabilized_tags()
+    if not stab:
+        print("[us71-pairs] FT-stab: results/tables/finetune/us53_selection.csv not found; skipped")
+        return
+    _export_ft("FT-stab", lambda t: stab.get(t, "base"), tasks, registry, expected, force)
+
+
+def _export_mt(system, srcs, seeds_of, tasks, registry, expected, force):
     from src.evaluation import report_frozen as RF
     from src.evaluation import report_us61 as R61
-    from src.evaluation import report_us63 as R63
     from src.models import frozen_heads as FH
-    from src.models import multitask as MT
     from src.models.baselines import load_config as load_baseline_config
 
-    cfg = MT.load_config()
-    c63 = cfg["compare63"]
-    srcs = R63.part_sources(c63, c63["candidates"]["gradnorm_a15"])
-    seeds_all = sorted(set(MT.load_config(c63["reference"]["variant"])["seeds"]))
     seed = load_baseline_config()["bootstrap"]["seed"]
     for t in tasks:
         if t not in srcs:
             continue
         task, source = registry[t], [srcs[t]]
-        seeds = R61.common_seeds([R61.available(source, task, seeds_all)])
+        seeds = R61.common_seeds([R61.available(source, task, seeds_of(task))])
         jobs = R61.load_sources(source, task, seeds) if seeds else None
         if jobs is None:
-            print(f"[us71-pairs] MT-GN15/{t}: no finished gradnorm_a15 jobs on this machine; skipped")
+            print(f"[us71-pairs] {system}/{t}: no finished multi-task jobs for tag {srcs[t][1]!r} on this machine; skipped")
             continue
         y_all, meta = FH.load_labels(task)
         s = R61.build_system(task, jobs, y_all, meta, 20, seed)["sys"]
-        _save_checked("MT-GN15", t, RF._enc(task, s["y"]), RF._enc(task, s["pred"]), s["meta"]["speaker"].to_numpy(), expected, force)
+        _save_checked(system, t, RF._enc(task, s["y"]), RF._enc(task, s["pred"]), s["meta"]["speaker"].to_numpy(), expected, force)
 
 
-EXPORTERS = {"B": export_B, "F": export_F, "FT-base": export_FT, "MT-GN15": export_GN15}
+def export_GN15(tasks, registry, expected, force):
+    from src.evaluation import report_us63 as R63
+    from src.models import multitask as MT
+
+    cfg = MT.load_config()
+    c63 = cfg["compare63"]
+    srcs = R63.part_sources(c63, c63["candidates"]["gradnorm_a15"])
+    seeds_all = sorted(set(MT.load_config(c63["reference"]["variant"])["seeds"]))
+    _export_mt("MT-GN15", srcs, lambda task: seeds_all, tasks, registry, expected, force)
+
+
+def export_MTfull(tasks, registry, expected, force):
+    """Equal-weight multi-task model: SO762 heads = US 6.3 candidate `full` (tag mt_base); L2 heads = the US 6.1 `lr` recipe (tag mt_lr, 4 folds x 3 seeds)."""
+    from src.evaluation import report_us63 as R63
+    from src.models import multitask as MT
+
+    cfg = MT.load_config()
+    c63 = cfg["compare63"]
+    srcs = dict(R63.part_sources(c63, c63["candidates"]["full"]))
+    lr = MT.load_config("lr")
+    srcs.update({h: (lr, "mt_lr") for h in lr["groups"]["l2"]["tasks"]})
+    so_seeds, l2_seeds = sorted(set(cfg["seeds"])), sorted(set(lr["l2_seeds"]))
+    _export_mt("MT-full", srcs, lambda task: so_seeds if task.dataset == "so762" else l2_seeds, tasks, registry, expected, force)
+
+
+EXPORTERS = {"B": export_B, "F": export_F, "FT-base": export_FT, "MT-GN15": export_GN15, "FT-stab": export_FTstab, "MT-full": export_MTfull}
 
 
 def main(argv=None) -> None:
