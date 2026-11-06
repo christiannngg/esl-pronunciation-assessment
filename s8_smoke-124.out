@@ -1,0 +1,28 @@
+20 adult utterances x 2 banks = 40 files -> /scratch/cgonzalez/aug_s8 (23 cores)
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+wrote 40 new files (0 existed)
+  shift_2_4: 20 files
+  shift_4_6: 20 files
+results/splits_s8/so762_cv_s8_fold0.csv
+results/splits_s8/so762_cv_s8_fold1.csv
+results/splits_s8/so762_cv_s8_fold2.csv
+results/splits_s8/so762_cv_s8_fold3.csv
+results/splits_s8/so762_cv_s8_fold4.csv
+     sent_prosodic          val 0.9876 train 0.7227 (head's own best epoch 1)
+     sent_total             val 1.3060 train 0.9976 (head's own best epoch 1)
+     word_accuracy          val 2.2208 train 1.5400 (head's own best epoch 1)
+     phone_score            val 0.4923 train 0.3341 (head's own best epoch 1)
+     phone_mispron_t1.0     val 0.5689 train 0.6111 (head's own best epoch 1)
+finished: 1 fitted
+     sent_prosodic          val 0.9766 train 0.7206 (head's own best epoch 1)
+     sent_total             val 1.3452 train 1.0439 (head's own best epoch 1)
+     word_accuracy          val 2.2713 train 1.5597 (head's own best epoch 1)
+     phone_score            val 0.4966 train 0.3365 (head's own best epoch 1)
+     phone_mispron_t1.0     val 0.5742 train 0.5899 (head's own best epoch 1)
+finished: 1 fitted
+     sent_prosodic          val 0.9879 train 0.7227 (head's own best epoch 1)
+     sent_total             val 1.3069 train 0.9980 (head's own best epoch 1)
+     word_accuracy          val 2.2208 train 1.5399 (head's own best epoch 1)
+     phone_score            val 0.4922 train 0.3341 (head's own best epoch 1)
+     phone_mispron_t1.0     val 0.5688 train 0.6116 (head's own best epoch 1)
+finished: 1 fitted
