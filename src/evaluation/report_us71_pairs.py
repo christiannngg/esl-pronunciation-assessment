@@ -45,7 +45,8 @@ from src.evaluation import report_us71 as R71
 BUNDLES = R71.REPO / "results" / "analysis" / "us71"
 COMPUTED = R71.TABLES / "midterm" / "us71_pairs_computed.csv"
 WANTED = [("B", "FT-base", R71.TASKS), ("B", "MT-GN15", R71.SO762), ("F", "MT-GN15", R71.SO762)]
-SYSTEM_TASKS = {"B": R71.TASKS, "F": R71.TASKS, "FT-base": R71.TASKS, "MT-GN15": R71.SO762, "FT-stab": R71.TASKS, "MT-full": R71.TASKS}
+SYSTEM_TASKS = {"B": R71.TASKS, "F": R71.TASKS, "FT-base": R71.TASKS, "MT-GN15": R71.SO762, "FT-stab": R71.TASKS, "MT-full": R71.TASKS,
+                "S8-F0": R71.SO762, "S8-FIX": R71.SO762}
 TOL = 1e-4
 PROBA_DIR = R71.REPO / "results" / "analysis" / "us82"
 PROBA_TASKS: set[str] = set()          # filled by `export --proba`: tasks whose positive-class probability is saved next to the bundle
@@ -285,7 +286,28 @@ def export_MTfull(tasks, registry, expected, force):
     _export_mt("MT-full", srcs, lambda task: so_seeds if task.dataset == "so762" else l2_seeds, tasks, registry, expected, force)
 
 
-EXPORTERS = {"B": export_B, "F": export_F, "FT-base": export_FT, "MT-GN15": export_GN15, "FT-stab": export_FTstab, "MT-full": export_MTfull}
+def _export_s8(system, tag, variant, tasks, registry, expected, force):
+    """US 8.3 final fits (official train/val/test split, seeds 0-2): tag s8final_<cand>, variant s8_<cand>."""
+    from src.models import multitask as MT
+
+    cfg = MT.load_config(variant)
+    srcs = {h: (cfg, tag) for h in cfg["groups"]["so762"]["tasks"]}
+    _export_mt(system, srcs, lambda task: sorted(set(cfg["seeds"])), tasks, registry, expected, force)
+
+
+def export_S8F0(tasks, registry, expected, force):
+    _export_s8("S8-F0", "s8final_f0", "s8_f0", tasks, registry, expected, force)
+
+
+def export_S8FIX(tasks, registry, expected, force):
+    """The candidate chosen (or, with no winner, the best single candidate) by the CV selection: results/tables/fix/us83_cv_selection.json."""
+    import json
+
+    cand = json.loads((R71.REPO / "results" / "tables" / "fix" / "us83_cv_selection.json").read_text())["evaluate"]
+    _export_s8("S8-FIX", f"s8final_{cand}", f"s8_{cand}", tasks, registry, expected, force)
+
+
+EXPORTERS = {"S8-F0": export_S8F0, "S8-FIX": export_S8FIX, "B": export_B, "F": export_F, "FT-base": export_FT, "MT-GN15": export_GN15, "FT-stab": export_FTstab, "MT-full": export_MTfull}
 
 
 def main(argv=None) -> None:

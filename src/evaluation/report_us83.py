@@ -148,11 +148,168 @@ def load_oof(cands: list[str], folds_csv: Path | None = None, seed: int = 0) -> 
     return out
 
 
+# --------------------------------------------------------------------------- #
+# the single test evaluation: control vs the candidate chosen by the CV (3 seeds each, official split)
+# --------------------------------------------------------------------------- #
+def _err_delta(task: str, key: str, sa, sb, W) -> dict:
+    """Change of the ERROR (RMSE, or 1 - macro-F1) from control a to fix b, with a paired speaker bootstrap: negative = the fix is better."""
+    f = lambda st: S.adverse(task, S.metrics(task, st)[key])
+    d = float(f(sb.sum(0)) - f(sa.sum(0)))
+    dr = f(W @ sb) - f(W @ sa)
+    lo, hi = S.interval(dr)
+    return {"delta": d, "lo": lo, "hi": hi, "p": S.pvalue(dr)}
+
+
+def final_table(control: str, fix: str, n_boot: int, seed: int, heads=HEADS) -> pd.DataFrame:
+    """Per head: overall, adult and child/teen error change (fix - control) with paired intervals, and the change of the child/teen - adult gap."""
+    rows = []
+    for task in heads:
+        frame = S.test_frame(task)
+        m = S.group_masks(frame)["age"]
+        cells = {}
+        for sysn in (control, fix):
+            b = S.load_bundle(sysn, task)
+            if b is None:
+                raise FileNotFoundError(f"missing bundle {sysn}__{task}: run `report_us71_pairs export --systems S8-F0 S8-FIX` on the lab first")
+            S.check_bundle(task, frame, b)
+            cells[sysn] = S.Cell(task, b["y"], b["pred"], b["speaker"])
+        key = R71.metric_of(task)
+        allm = np.ones(len(frame), bool)
+        st = {(s, g): cells[s].stats(mk) for s in cells for g, mk in (("overall", allm), ("adult", m["adult"]), ("child/teen", m["child/teen"]))}
+        Wd = {"overall": S.weights(len(st[(control, "overall")]), n_boot, seed + 2), "adult": S.weights(len(st[(control, "adult")]), n_boot, seed),
+              "child/teen": S.weights(len(st[(control, "child/teen")]), n_boot, seed + 1)}
+        row = {"task": task, "target": task == TARGET, "metric": key}
+        for g in ("overall", "adult", "child/teen"):
+            d = _err_delta(task, key, st[(control, g)], st[(fix, g)], Wd[g])
+            row.update({f"{g}_{k}": v for k, v in d.items()})
+            row[f"{g}_control_error"] = float(S.adverse(task, S.metrics(task, st[(control, g)].sum(0))[key]))
+        ga, gb = (S.gap_draws(task, st[(s, "adult")], st[(s, "child/teen")], Wd["adult"], Wd["child/teen"]) for s in (control, fix))
+        lo, hi = S.interval(gb[1] - ga[1])
+        row.update({"gap_control": ga[0], "gap_fix": gb[0], "gap_delta": gb[0] - ga[0], "gap_lo": lo, "gap_hi": hi, "gap_p": S.pvalue(gb[1] - ga[1])})
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def acceptance(t: pd.DataFrame) -> dict:
+    """The three acceptance rules of docs/sprint8_plan.md section 5, on the error scale (negative delta = the fix is better)."""
+    tgt = t[t["target"]]
+    better = ((tgt["child/teen_delta"] < 0) & (tgt["child/teen_hi"] < 0)).any()
+    sig_worse_target = ((tgt["child/teen_delta"] > 0) & (tgt["child/teen_lo"] > 0)).any()
+    r1 = bool(better and not sig_worse_target)
+    worse_heads = t.loc[(t["overall_delta"] > 0) & (t["overall_lo"] > 0), "task"].tolist()
+    r2 = not worse_heads
+    r3 = not ((tgt["adult_delta"] > 0) & (tgt["adult_lo"] > 0)).any()
+    return {"rule_i_child_target_improves_and_none_worse": r1, "rule_ii_no_head_significantly_worse_overall": r2, "worse_heads": worse_heads,
+            "rule_iii_adult_target_not_worse": r3, "accepted": bool(r1 and r2 and r3)}
+
+
+# --------------------------------------------------------------------------- #
+# reference analysis (NOT a candidate): per-age-group decision thresholds on F0's out-of-fold probabilities, fit by nested folds
+# --------------------------------------------------------------------------- #
+GRID = np.linspace(0.05, 0.95, 91)
+
+
+def _macro_f1(y: np.ndarray, pred: np.ndarray) -> float:
+    f = []
+    for c in (0, 1):
+        tp, fp, fn = np.sum((pred == c) & (y == c)), np.sum((pred == c) & (y != c)), np.sum((pred != c) & (y == c))
+        f.append(0.0 if tp == 0 else 2 * tp / (2 * tp + fp + fn))
+    return float(np.mean(f))
+
+
+def _best_threshold(y: np.ndarray, p: np.ndarray) -> float:
+    scores = [_macro_f1(y, (p >= t).astype(int)) for t in GRID]
+    return float(GRID[int(np.argmax(scores))])
+
+
+def threshold_reference(frame: pd.DataFrame, n_boot: int, seed: int) -> pd.DataFrame:
+    """``frame``: DataFrame(row, speaker, age_group, fold, y, p) = F0's pooled out-of-fold positive-class probabilities. The thresholds applied to fold k
+    are fit on the OTHER folds only: one pooled threshold, and one per age group. Rows of the result: default (0.5), pooled threshold, per-group thresholds."""
+    f = frame.sort_values("row").reset_index(drop=True)
+    y, p, g = f["y"].to_numpy(int), f["p"].to_numpy(float), f["age_group"].to_numpy()
+    pred = {"default (0.5)": (p >= 0.5).astype(int), "pooled threshold": np.zeros(len(f), int), "per-group thresholds": np.zeros(len(f), int)}
+    used = []
+    for k in sorted(f["fold"].unique()):
+        te, tr = (f["fold"] == k).to_numpy(), (f["fold"] != k).to_numpy()
+        tp = _best_threshold(y[tr], p[tr])
+        pred["pooled threshold"][te] = (p[te] >= tp).astype(int)
+        tg = {grp: _best_threshold(y[tr & (g == grp)], p[tr & (g == grp)]) for grp in np.unique(g)}
+        for grp, t in tg.items():
+            m = te & (g == grp)
+            pred["per-group thresholds"][m] = (p[m] >= t).astype(int)
+        used.append({"fold": int(k), "pooled": tp, **{f"t_{grp}": t for grp, t in tg.items()}})
+    rows = []
+    cells = {name: S.Cell(TARGET, y, pr, f["speaker"].to_numpy()) for name, pr in pred.items()}
+    masks = {"adult": g == "adult", "child/teen": g == "child/teen"}
+    sts = {(name, grp): c.stats(mk) for name, c in cells.items() for grp, mk in masks.items()}
+    base = "default (0.5)"
+    for name in pred:
+        row = {"rule": name}
+        for grp, mk in masks.items():
+            st = sts[(name, grp)]
+            met = S.metrics(TARGET, st.sum(0))
+            row[f"{grp}_error"] = float(1 - met["macro_f1"])
+            row[f"{grp}_recall"] = float(met["recall"])
+            W = S.weights(len(st), n_boot, seed if grp == "adult" else seed + 1)
+            d = _err_delta(TARGET, "macro_f1", sts[(base, grp)], st, W)
+            row.update({f"{grp}_delta_vs_default": d["delta"], f"{grp}_lo": d["lo"], f"{grp}_hi": d["hi"]})
+        row["gap"] = row["child/teen_error"] - row["adult_error"]
+        rows.append(row)
+    out = pd.DataFrame(rows)
+    out.attrs["thresholds"] = pd.DataFrame(used)
+    return out
+
+
+def load_oof_proba(cand: str = CONTROL, folds_csv: Path | None = None, seed: int = 0) -> pd.DataFrame:
+    from src.models import fix_s8 as FS
+    from src.models import frozen_heads as FH
+    from src.models import multitask as MT
+    from src.models.baselines import build_tasks, load_config as load_baseline_config
+    cfg = MT.load_config("s8_f0")
+    task = build_tasks(load_baseline_config())[TARGET]
+    y_all, meta = FH.load_labels(task)
+    grp = FS.speaker_groups(meta["speaker"])
+    parts = []
+    for k in range(FS.N_FOLDS):
+        z = np.load(MT.job_file(cfg, tag_of(cand, k), TARGET, 0, seed), allow_pickle=True)
+        rows, proba = z["test_rows"], z["test_proba"]
+        pos = list(z["classes"]).index("1") if "classes" in z.files and "1" in list(z["classes"]) else 1
+        parts.append(pd.DataFrame({"row": rows, "speaker": meta["speaker"].to_numpy()[rows], "age_group": grp[rows], "fold": k,
+                                   "y": FH.encode_y(task, y_all)[rows], "p": proba[:, pos]}))
+    return pd.concat(parts, ignore_index=True)
+
+
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("command", nargs="?", default="select", choices=["select", "reference", "final"])
     ap.add_argument("--candidates", nargs="*", default=None)
     ap.add_argument("--seed-job", type=int, default=0)
     a = ap.parse_args(argv)
+    import json
+    if a.command == "reference":
+        nb, seed = S.boot_settings()
+        t = threshold_reference(load_oof_proba(seed=a.seed_job), nb, seed)
+        OUT.mkdir(parents=True, exist_ok=True)
+        t.to_csv(OUT / "us83_threshold_reference.csv", index=False)
+        t.attrs["thresholds"].to_csv(OUT / "us83_threshold_reference_thresholds.csv", index=False)
+        pd.set_option("display.width", 220)
+        print(t.round(3).to_string(index=False))
+        print(t.attrs["thresholds"].round(2).to_string(index=False))
+        return
+    if a.command == "final":
+        nb, seed = S.boot_settings()
+        pick = json.loads((OUT / "us83_cv_selection.json").read_text())
+        tab = final_table("S8-F0", "S8-FIX", nb, seed)
+        verdict = acceptance(tab)
+        verdict["candidate"] = pick["evaluate"]
+        verdict["cv_winner"] = pick["winner"]
+        tab.to_csv(OUT / "us83_final_test.csv", index=False)
+        (OUT / "us83_final_verdict.json").write_text(json.dumps(verdict, indent=2))
+        pd.set_option("display.width", 250)
+        print(tab[["task", "overall_delta", "overall_lo", "overall_hi", "adult_delta", "adult_lo", "adult_hi", "child/teen_delta", "child/teen_lo", "child/teen_hi",
+                   "gap_delta", "gap_lo", "gap_hi"]].round(3).to_string(index=False))
+        print(verdict)
+        return
     import yaml
     cands = a.candidates or yaml.safe_load((S.REPO / "configs" / "multitask.yaml").read_text())["s8"]["candidates"]
     nb, seed = S.boot_settings()

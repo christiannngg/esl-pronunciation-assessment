@@ -9,6 +9,8 @@
 #   cv <cand>...|all      5 folds x each candidate (f0 f1_s05 f1_s10 f2_a f2_b); `all` also builds the F2 banks in the background while F0/F1 train
 #   status                which CV jobs are finished
 #   select                -> results/tables/fix/us83_cv_selection.{csv,json}   (NO GPU; needs all CV jobs)
+#   reference             per-age-group threshold reference on F0 out-of-fold probabilities -> us83_threshold_reference*.csv (NO GPU)
+#   final                 the ONE test evaluation: trains s8final_f0 and s8final_<selected candidate>, 3 seeds each, official split, then exports their prediction bundles
 # The selection rule (docs/sprint8_plan.md section 5 + the two precisions logged in its section 9) was fixed before any of these jobs ran.
 cd "$(dirname "$0")" || exit 1
 source .venv/bin/activate
@@ -79,6 +81,20 @@ case "${1:-}" in
       f="experiments/results/multitask/s8cv${k}_${c}/phone_mispron_t1.0/fold0/seed0.npz"; [ -f "$f" ] && echo "done  s8cv${k}_${c}" || echo "MISSING s8cv${k}_${c}"
     done; done ;;
   select)
-    shift; python -m src.evaluation.report_us83 "$@" ;;
-  *) echo "usage: bash run_83_lab.sh test|aug|smoke|cv <cand>...|all|status|select"; exit 1 ;;
+    shift; python -m src.evaluation.report_us83 select "$@" ;;
+  reference)
+    python -m src.evaluation.report_us83 reference ;;
+  final)
+    cand=$(python -c "import json;print(json.load(open('results/tables/fix/us83_cv_selection.json'))['evaluate'])")
+    echo "selected for the single test evaluation: $cand"
+    case "$cand" in f2*) python experiments/scripts/precompute_aug_s8.py --cores 7 ;; esac     # /scratch is per GPU node: rebuild (resumable) if this job landed on the other one
+    for c in f0 "$cand"; do
+      for seed in 0 1 2; do
+        python -m src.models.multitask run --tag "s8final_$c" --variant "s8_$c" --groups so762 --seeds $seed 2>&1 | tee -a "logs/83_s8final_$c.log" | tail -n 8
+        [ "${PIPESTATUS[0]}" -ne 0 ] && echo "FAILED s8final_$c seed $seed" | tee -a "$FAILED"
+      done
+    done
+    python -m src.evaluation.report_us71_pairs export --systems S8-F0 S8-FIX
+    cat "$FAILED" ;;
+  *) echo "usage: bash run_83_lab.sh test|aug|smoke|cv <cand>...|all|status|select|reference|final"; exit 1 ;;
 esac

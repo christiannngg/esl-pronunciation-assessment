@@ -107,3 +107,41 @@ def test_misaligned_rows_are_refused():
     b = {h: d.assign(row=d["row"] + 1) for h, d in a.items()}
     with pytest.raises(ValueError):
         R.run_selection({"f0": a, "f1_s05": b}, 50, 0)
+
+
+def _row(task, target, od, olo, ohi, ad, alo, ahi, cd, clo, chi):
+    return {"task": task, "target": target, "overall_delta": od, "overall_lo": olo, "overall_hi": ohi, "adult_delta": ad, "adult_lo": alo, "adult_hi": ahi,
+            "child/teen_delta": cd, "child/teen_lo": clo, "child/teen_hi": chi}
+
+
+def test_acceptance_rules():
+    ok = pd.DataFrame([_row("sent_total", False, 0.0, -0.02, 0.02, 0, -0.02, 0.02, 0, -0.03, 0.03),
+                       _row(R.TARGET, True, -0.02, -0.04, 0.0, 0.0, -0.02, 0.02, -0.06, -0.10, -0.02)])
+    v = R.acceptance(ok)
+    assert v["accepted"] and v["rule_i_child_target_improves_and_none_worse"]
+    # child/teen interval touching 0: not an improvement
+    nope = ok.copy(); nope.loc[1, "child/teen_hi"] = 0.01
+    assert not R.acceptance(nope)["accepted"]
+    # a head significantly worse overall
+    bad = ok.copy(); bad.loc[0, ["overall_delta", "overall_lo", "overall_hi"]] = [0.05, 0.02, 0.08]
+    v = R.acceptance(bad)
+    assert not v["rule_ii_no_head_significantly_worse_overall"] and v["worse_heads"] == ["sent_total"] and not v["accepted"]
+    # adult target significantly worse
+    ad = ok.copy(); ad.loc[1, ["adult_delta", "adult_lo", "adult_hi"]] = [0.05, 0.02, 0.08]
+    assert not R.acceptance(ad)["rule_iii_adult_target_not_worse"]
+
+
+def test_threshold_reference_removes_a_pure_calibration_gap():
+    rng = np.random.default_rng(0)
+    n_spk, per = 40, 80
+    spk = np.repeat([f"s{i}" for i in range(n_spk)], per)
+    grp = np.repeat(np.array(["adult"] * 20 + ["child/teen"] * 20), per)
+    fold = np.repeat(np.tile(np.arange(5), 8), per)
+    y = (rng.random(n_spk * per) < 0.3).astype(int)
+    score = np.clip(0.5 + 0.35 * (2 * y - 1) + rng.normal(0, 0.12, len(y)), 0, 1)             # same ranking quality in both groups ...
+    p = np.where(grp == "child/teen", score - 0.25, score)                                    # ... but child/teen scores sit lower (calibration gap)
+    f = pd.DataFrame({"row": np.arange(len(y)), "speaker": spk, "age_group": grp, "fold": fold, "y": y, "p": np.clip(p, 0, 1)})
+    t = R.threshold_reference(f, 100, 0).set_index("rule")
+    assert t.loc["default (0.5)", "child/teen_error"] > t.loc["per-group thresholds", "child/teen_error"] + 0.05
+    assert abs(t.loc["per-group thresholds", "adult_delta_vs_default"]) < 0.05                # adults unaffected
+    assert t.loc["per-group thresholds", "gap"] < t.loc["default (0.5)", "gap"]
