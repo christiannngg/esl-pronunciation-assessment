@@ -113,6 +113,23 @@ compare63:
     and never select. Every candidate is reported, not only the adopted one (winner's curse: five candidates are screened on 19 validation speakers).
   per_head_checkpointing: only_if_a_head_keeps_regret_above_2_percent    # (d) of the plan; not implemented unless the candidates leave that regret
 
+# ---------------------------------------------------------------------------------------------------------------------------------------------------
+# US 8.3 fix candidates (docs/sprint8_plan.md section 5; src/models/fix_s8.py). Declared BEFORE any US 8.3 job was run. Base = MT-GN15 (gradnorm, alpha 1.5, recipe
+# `base`, all seven SO762 heads); each candidate changes ONE thing. Run inside the speaker-grouped CV: --split-csv data/splits/ (fold files made by fix_s8.fold_split_csv).
+#   F0  control = MT-GN15 unchanged.
+#   F1  age-group reweighting of every head's loss within each label (strength 0.5 = square root, 1.0 = groups equal within each label); train.cw is kept.
+#   F2  child-like copies of adult training utterances (pitch + formant scaling by librosa/torchaudio pitch_shift, duration preserved, NO time stretch so that
+#       fluency / prosody labels and phone timings survive), swapped in with probability 0.5; shifts drawn once per utterance from [lo, hi] semitones UPWARD.
+#   F3  (stretch, only if F1 and F2 are done by Fri Nov 6 midday) gradient-reversal age adversary; not defined here.
+# ---------------------------------------------------------------------------------------------------------------------------------------------------
+s8:
+  target_head: phone_mispron_t1.0
+  n_folds: 5
+  aug_root_env: S8_AUG_ROOT          # where precompute_aug_s8.py wrote the copies (default results/aug_s8; use the lab scratch disk)
+  aug_banks: {shift_2_4: [2.0, 4.0], shift_4_6: [4.0, 6.0]}
+  candidates: [f0, f1_s05, f1_s10, f2_a, f2_b]
+
+
 variants:
   # `lr` is inherited from finetune.yaml.
   # ---- US 6.3: regrouping by level and loss-weighting schemes (SO762 only; recipe `base`, everything else as the full model) ----
@@ -132,3 +149,9 @@ variants:
     train: {loss: {weights: {phone_mispron_t1.0: 3.0}}}
   word_phone:                                                                 # the word / phone block only (no sentence heads); added after the first diagnosis
     groups: {so762: {tasks: [word_accuracy, phone_score, phone_mispron_t1.0]}}
+  # ---- US 8.3 fix candidates (see the s8 block above) ----
+  s8_f0:     {train: {loss: {scheme: gradnorm, alpha: 1.5}}}
+  s8_f1_s05: {train: {loss: {scheme: gradnorm, alpha: 1.5}, fix: {weights: {strength: 0.5}}}}
+  s8_f1_s10: {train: {loss: {scheme: gradnorm, alpha: 1.5}, fix: {weights: {strength: 1.0}}}}
+  s8_f2_a:   {train: {loss: {scheme: gradnorm, alpha: 1.5}, fix: {aug: {name: shift_2_4, prob: 0.5}}}}
+  s8_f2_b:   {train: {loss: {scheme: gradnorm, alpha: 1.5}, fix: {aug: {name: shift_4_6, prob: 0.5}}}}

@@ -33,6 +33,7 @@ Outputs. One job = (tag, group, fold, seed):
 from __future__ import annotations
 
 import argparse
+import os
 import time
 from pathlib import Path
 
@@ -42,6 +43,7 @@ import yaml
 
 from src.features import ssl_embeddings as se
 from src.models import finetune as FT
+from src.models import fix_s8 as FS
 from src.models import frozen_heads as FH
 from src.models.baselines import REPO, Task, build_tasks
 from src.models.baselines import load_config as load_baseline_config
@@ -349,12 +351,14 @@ class MTData:
         return self._splits[fold]
 
 
-def collate_mt(md: MTData, utts, device, side_t: dict, yt: dict | None, aug=None, aug_rng=None):
+def collate_mt(md: MTData, utts, device, side_t: dict, yt: dict | None, aug=None, aug_rng=None, bank=None):
     """-> x, lens, spans_by_table, rows{head}, side{head}, y{head}. Pooled units of a table come out of the model in the order of ``rows``."""
     torch = FT._torch()
     wavs = [md.wav(int(u)) for u in utts]
     if aug and float(aug.get("noise_prob", 0.0)) > 0 and aug_rng is not None:          # training batches only
         wavs = [FT.add_noise(w, aug_rng, aug["snr_db"]) if aug_rng.random() < float(aug["noise_prob"]) else w for w in wavs]
+    if bank is not None and aug_rng is not None:                                        # US 8.3 F2: child-like copies of adult training utterances
+        wavs = [bank.maybe(md.utt_ids[int(u)], w, aug_rng) for u, w in zip(utts, wavs)]
     lens = np.array([len(w) for w in wavs])
     x = torch.zeros((len(wavs), int(lens.max())), dtype=torch.float32)
     for b, w in enumerate(wavs):
@@ -525,13 +529,28 @@ def run_group(group: str, md: MTData, enc_cache: dict, cfg: dict, tag: str, fold
         else:
             d["yt"] = torch.as_tensor(yi, dtype=torch.long, device=dev)
             cw = FH.balanced_weights(yi[tr_rows[n]], d["K"]) if tcfg.get("cw") == "balanced" else None
-            d["loss_fn"] = nn.CrossEntropyLoss(weight=None if cw is None else torch.as_tensor(cw, dtype=torch.float32, device=dev))
+            d["cw_t"] = None if cw is None else torch.as_tensor(cw, dtype=torch.float32, device=dev)
+            d["loss_fn"] = nn.CrossEntropyLoss(weight=d["cw_t"])
         mu_s, sd_s = td.side[tr_rows[n]].mean(0), td.side[tr_rows[n]].std(0)
         sd_s[sd_s < 1e-6] = 1.0
         d["side_t"] = torch.as_tensor((td.side - mu_s) / sd_s, dtype=torch.float32, device=dev)
         st[n] = d
     side_t = {n: st[n]["side_t"] for n in names}
     yt = {n: st[n]["yt"] for n in names}
+
+    # ---- US 8.3 hooks (absent from every earlier config: nothing below changes a run without a `train.fix` block) ----
+    fix = tcfg.get("fix") or {}
+    wrow: dict = {}
+    if (fix.get("weights") or {}).get("strength", 0.0):
+        for n in names:                                                              # F1: age-group reweighting within each label, from the TRAINING rows only
+            td = md.td[n]
+            trm = np.zeros(len(td.meta), bool)
+            trm[tr_rows[n]] = True
+            lab = td.yi if not st[n]["reg"] else FS.label_bins(td.y_raw, trm)
+            wrow[n] = torch.as_tensor(FS.row_weights(FS.speaker_groups(td.meta["speaker"]), lab, trm, float(fix["weights"]["strength"])), dtype=torch.float32, device=dev)
+    bank = None
+    if fix.get("aug"):                                                              # F2: child-like copies of adult training utterances
+        bank = FS.AugBank(os.environ.get("S8_AUG_ROOT", str(REPO / "results" / "aug_s8")), fix["aug"]["name"], fix["aug"]["prob"])
 
     # ---- model ----
     enc, _ = enc_cache["load"](mcfg)
@@ -558,8 +577,15 @@ def run_group(group: str, md: MTData, enc_cache: dict, cfg: dict, tag: str, fold
     def decode(n, out):
         return (out.squeeze(-1) * st[n]["sd"] + st[n]["mu"]) if st[n]["reg"] else torch.softmax(out, 1)
 
-    def lossf(n, out, y):
-        return st[n]["loss_fn"](out.squeeze(-1) if st[n]["reg"] else out, y)
+    def lossf(n, out, y, w=None):
+        o = out.squeeze(-1) if st[n]["reg"] else out
+        if w is None:
+            return st[n]["loss_fn"](o, y)
+        if st[n]["reg"]:                                                            # weighted MSE
+            return (w * (o - y) ** 2).sum() / w.sum()
+        l = torch.nn.functional.cross_entropy(o, y, weight=st[n]["cw_t"], reduction="none")     # includes the class weight of the control
+        den = (w * (st[n]["cw_t"][y] if st[n]["cw_t"] is not None else 1.0)).sum()
+        return (w * l).sum() / den
 
     @torch.no_grad()
     def predict(utts, exact: bool) -> dict:
@@ -605,9 +631,9 @@ def run_group(group: str, md: MTData, enc_cache: dict, cfg: dict, tag: str, fold
             model.enc.train(model.train_encoder)
             for g in opt.param_groups:
                 g["lr"] = g["base_lr"] * (e_s if g["kind"] == "enc" else h_s)
-            x, lens, spans, rows, side, ys = collate_mt(md, tr_u[bidx], dev, side_t, yt, aug, aug_rng)
+            x, lens, spans, rows, side, ys = collate_mt(md, tr_u[bidx], dev, side_t, yt, aug, aug_rng, bank)
             outs = model(x, lens, spans, side, amp)
-            losses = {n: lossf(n, outs[n], ys[n]) for n in names}
+            losses = {n: lossf(n, outs[n], ys[n], wrow[n][torch.as_tensor(rows[n], device=dev)] if n in wrow else None) for n in names}
             weighter.observe(losses)
             k_enc = step - freeze
             is_diag = bool(diag_every and model.train_encoder and k_enc % diag_every == 0)
@@ -767,7 +793,7 @@ def cmd_run(args) -> None:
                 if args.budget and time.time() - t0 > args.budget:
                     print(f"budget of {args.budget:.0f}s used: {fitted} fitted; run again to continue")
                     return
-                md = md or MTData(tasks, do_norm)
+                md = md or MTData(tasks, do_norm, split_csv=Path(args.split_csv) if args.split_csv else None)
                 print(f"=== {args.tag} {group} ({len(tasks)} heads) fold{fold} seed{seed} ({device})")
                 r = run_group(group, md, cache, cfg, args.tag, fold, seed, device)
                 fitted += 1
@@ -821,6 +847,7 @@ def main(argv=None) -> None:
             p.add_argument("--budget", type=float, default=None, help="stop starting new jobs after this many seconds")
             p.add_argument("--force", action="store_true")
             p.add_argument("--epochs", type=int, default=None, help="override train.max_epochs (smoke tests)")
+            p.add_argument("--split-csv", default=None, help="US 8.3: SO762 split file (speaker, split) replacing data/splits/so762_speakers.csv, e.g. a cross-validation fold")
     args = ap.parse_args(argv)
     {"run": cmd_run, "status": cmd_status, "dry-run": cmd_dry_run}[args.cmd](args)
 

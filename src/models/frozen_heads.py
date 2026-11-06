@@ -64,7 +64,8 @@ def load_labels(task: Task, tdir: Path | None = None, split_csv: Path | None = N
     if task.dataset == "so762":      # official flag in the meta is overridden by the Sprint 2 train/val/test speakers
         sp = pd.read_csv(split_csv or SPLIT_CSV, dtype={"speaker": str}).set_index("speaker")["split"]
         meta["split"] = meta["speaker"].map(sp)
-        assert meta["split"].notna().all() and set(meta["split"]) == {"train", "val", "test"}
+        # `excluded` (US 8.3 cross-validation files): speakers that are in no split of this run (the official test speakers). Absent in every other split file.
+        assert meta["split"].notna().all() and set(meta["split"]) - {"excluded"} == {"train", "val", "test"}
     y = meta[task.target].to_numpy()
     if task.thr is not None:
         y = (y < task.thr).astype(int)

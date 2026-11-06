@@ -1,6 +1,6 @@
 # Weakness memo, Sprint 8 (US 8.2)
 
-Status: checks 1, 3 and the ablation are done. Check 2 (ranking vs calibration) awaits the lab probability export. Check 4 (age probe) is optional.
+Status: checks 1, 2, 3 and the ablation are done. Check 4 (age probe) is optional and not run.
 Source tables: `results/tables/generalization/us82_*.csv`. Code: `src/evaluation/report_us82.py`. Sign convention: ablation `delta` is the metric change (RMSE for regression, macro-F1 for classification); `delta_gap` is on the error scale, positive = child/teen relatively worse.
 
 ## 1. Target (rule kept as written)
@@ -12,6 +12,16 @@ Weakest subgroup: SO762 child/teen. Target head: `phone_mispron_t1.0`, the only 
 **Check 1 (is it label noise or range restriction?).** The child/teen compression is real. Matching adult label distributions to the child's leaves the slope gap unchanged. Label noise (Spearman-Brown reliability of the 5-expert consensus) explains only ~6-12% of slope attenuation, against ~40-64% observed. The PCC gap is partly range restriction/noise: for `phone_score` it vanishes after label matching.
 
 **Check 3 (where in the score range).** Child/teen speakers have few low-score items (sent_accuracy <=6: 7% vs 24.5% adult; word_accuracy 0-4: 3% vs 7%). Errors are in the tails, with positive bias at low scores: sent_accuracy <=6 bias +2.63 (child/teen) vs +1.11 (adult); word_accuracy 0-4 bias +6.42 vs +4.60. The model regresses to the mean most where child/teen training data is thinnest.
+
+**Check 2 (ranking vs calibration, target head, test set; `us82_check2_ranking.csv`).** Recall of mispronounced phones at the pooled operating point is far lower for child/teen than adult. Splitting that gap into a ranking part (adult recall minus child recall at the adult false-positive rate) and a calibration part (child recall at adult FPR minus child recall at the pooled threshold):
+
+| System  | Recall adult / child (pooled threshold) | Total gap | Ranking part [95% CI] | Calibration part [95% CI] | AUC adult / child |
+| ------- | --------------------------------------- | --------- | --------------------- | ------------------------- | ----------------- |
+| FT-base | 0.437 / 0.172                           | 0.264     | 0.092 [-0.015, 0.203] | 0.172 [0.064, 0.268]      | 0.909 / 0.868     |
+| MT-full | 0.330 / 0.052                           | 0.278     | 0.092 [-0.007, 0.198] | 0.187 [0.069, 0.288]      | 0.917 / 0.864     |
+| MT-GN15 | 0.465 / 0.127                           | 0.338     | 0.057 [-0.047, 0.181] | **0.281 [0.144, 0.372]**  | 0.911 / 0.869     |
+
+For MT-GN15, about 83% of the recall gap is calibration (the pooled threshold sits too high for child/teen scores) and the ranking part is not significant. Ranking is not perfectly equal: AUC is lower for child/teen (-0.04, CI excludes zero), and AP is lower (-0.20), though AP also depends on the lower child/teen positive rate (3.0% vs 5.2%). FT-stab and FT-base are identical on this head (same classification head), so FT-stab is listed once in effect.
 
 ## 3. Ablation (MT-GN15 is the demo model)
 
@@ -27,12 +37,13 @@ L2-ARCTIC (exploratory, descriptive): B->F and F->FT-stab both improve phone err
 
 ## 4. What this means for US 8.3
 
-- Two mechanisms on the target head: (a) pretrained features favour adults (B->F); (b) multi-task sharing hurts child/teen mispronunciation F1 (-0.024 for GN15, -0.071 for full). Fine-tuning itself is neutral.
-- Candidate fixes should therefore act on the shared-representation/multi-task side of the target head (e.g. child-aware loss weighting or head-specific treatment), not on fine-tuning intensity. FT-stab-style stabilization is a regression-head effect and is secondary.
+- Mechanisms on the target head: (a) pretrained features favour adults (B->F); (b) multi-task sharing hurts child/teen mispronunciation F1 (-0.024 for GN15, -0.071 for full); fine-tuning itself is neutral. Check 2 adds that the harm shows up mainly as miscalibration at a shared threshold (calibration part 0.281 of 0.338), with only a small, non-significant ranking deficit.
+- Candidate fixes should therefore be ordered by this evidence: (1) group-aware score/threshold calibration or child-weighted loss for the target head, which attacks the dominant calibration component; (2) loss reweighting or head-specific treatment on the multi-task side, which attacks the shared-representation component. Fine-tuning intensity and FT-stab-style stabilization are not indicated for this head.
+- Any group-aware threshold needs the age group at inference, or a speaker-independent proxy. This must be stated as a deployment condition in the 8.3 case study, and selection must happen by speaker-grouped CV, not on test.
 - The target-head F1 gap vs MT-GN15 is the number to move. Success is judged by the pre-declared acceptance rules in `docs/sprint8_plan.md`.
 
 ## 5. Caveats
 
 - Holm-significant evidence for mechanism (b) is not available (p=0.12); the child F1 drop CI excludes zero but the gap change does not survive Family B correction. Present as suggestive.
-- Hard predictions only so far: no AUC/AP, so ranking vs calibration (check 2) is not yet separated.
+- Check 2 covers FT-base, FT-stab, MT-full, MT-GN15 only (B and F have no probability export). Calibration conclusions use a pooled operating point chosen on all test speakers.
 - One seed per system in these bundles for the ablation contrasts.
