@@ -1,0 +1,81 @@
+1340 adult utterances x 2 banks = 2680 files -> /scratch/cgonzalez/aug_s8 (7 cores)
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+wrote 2640 new files (40 existed)
+  shift_2_4: 1340 files
+  shift_4_6: 1340 files
+results/splits_s8/so762_cv_s8_fold0.csv
+results/splits_s8/so762_cv_s8_fold1.csv
+results/splits_s8/so762_cv_s8_fold2.csv
+results/splits_s8/so762_cv_s8_fold3.csv
+results/splits_s8/so762_cv_s8_fold4.csv
+=== f2_a fold 0
+     sent_prosodic          val 0.9389 train 0.6034 (head's own best epoch 10)
+     sent_total             val 1.0578 train 0.5574 (head's own best epoch 4)
+     word_accuracy          val 2.3160 train 0.7736 (head's own best epoch 2)
+     phone_score            val 0.4690 train 0.1975 (head's own best epoch 9)
+     phone_mispron_t1.0     val 0.7162 train 0.8739 (head's own best epoch 6)
+finished: 1 fitted
+=== f2_a fold 1
+     sent_prosodic          val 0.8285 train 0.6137 (head's own best epoch 11)
+     sent_total             val 0.9845 train 0.6194 (head's own best epoch 10)
+     word_accuracy          val 2.0039 train 0.6419 (head's own best epoch 4)
+     phone_score            val 0.4146 train 0.1902 (head's own best epoch 9)
+     phone_mispron_t1.0     val 0.7010 train 0.8750 (head's own best epoch 11)
+finished: 1 fitted
+=== f2_a fold 2
+     sent_prosodic          val 0.9212 train 0.6577 (head's own best epoch 9)
+     sent_total             val 1.0520 train 0.6225 (head's own best epoch 12)
+     word_accuracy          val 1.8839 train 0.5990 (head's own best epoch 6)
+     phone_score            val 0.3773 train 0.1745 (head's own best epoch 6)
+     phone_mispron_t1.0     val 0.6912 train 0.9149 (head's own best epoch 9)
+finished: 1 fitted
+=== f2_a fold 3
+     sent_prosodic          val 0.8858 train 0.6056 (head's own best epoch 7)
+     sent_total             val 1.1961 train 0.6053 (head's own best epoch 4)
+     word_accuracy          val 2.1660 train 0.8465 (head's own best epoch 4)
+     phone_score            val 0.4443 train 0.1930 (head's own best epoch 4)
+     phone_mispron_t1.0     val 0.7066 train 0.8469 (head's own best epoch 7)
+finished: 1 fitted
+=== f2_a fold 4
+     sent_prosodic          val 0.7428 train 0.6257 (head's own best epoch 6)
+     sent_total             val 1.0700 train 0.6200 (head's own best epoch 9)
+     word_accuracy          val 1.8538 train 0.8556 (head's own best epoch 3)
+     phone_score            val 0.3892 train 0.2187 (head's own best epoch 7)
+     phone_mispron_t1.0     val 0.7101 train 0.8258 (head's own best epoch 12)
+finished: 1 fitted
+=== f2_b fold 0
+     sent_prosodic          val 0.9576 train 0.6117 (head's own best epoch 7)
+     sent_total             val 1.0245 train 0.6294 (head's own best epoch 2)
+     word_accuracy          val 2.2771 train 1.0051 (head's own best epoch 2)
+     phone_score            val 0.4640 train 0.2220 (head's own best epoch 6)
+     phone_mispron_t1.0     val 0.7059 train 0.8256 (head's own best epoch 9)
+finished: 1 fitted
+=== f2_b fold 1
+     sent_prosodic          val 0.8319 train 0.6170 (head's own best epoch 11)
+     sent_total             val 0.9696 train 0.6071 (head's own best epoch 11)
+     word_accuracy          val 2.0046 train 0.7326 (head's own best epoch 5)
+     phone_score            val 0.4089 train 0.1904 (head's own best epoch 9)
+     phone_mispron_t1.0     val 0.7090 train 0.8819 (head's own best epoch 10)
+finished: 1 fitted
+=== f2_b fold 2
+     sent_prosodic          val 0.9377 train 0.6590 (head's own best epoch 9)
+     sent_total             val 1.0590 train 0.6524 (head's own best epoch 10)
+     word_accuracy          val 1.8830 train 0.6569 (head's own best epoch 4)
+     phone_score            val 0.3757 train 0.1816 (head's own best epoch 10)
+     phone_mispron_t1.0     val 0.6842 train 0.8975 (head's own best epoch 14)
+finished: 1 fitted
+=== f2_b fold 3
+     sent_prosodic          val 0.8635 train 0.6265 (head's own best epoch 10)
+     sent_total             val 1.2350 train 0.6367 (head's own best epoch 4)
+     word_accuracy          val 2.1757 train 0.9154 (head's own best epoch 1)
+     phone_score            val 0.4500 train 0.2054 (head's own best epoch 5)
+     phone_mispron_t1.0     val 0.7064 train 0.8397 (head's own best epoch 6)
+finished: 1 fitted
+=== f2_b fold 4
+     sent_prosodic          val 0.7668 train 0.5777 (head's own best epoch 3)
+     sent_total             val 1.4517 train 1.1207 (head's own best epoch 13)
+     word_accuracy          val 1.8525 train 0.7668 (head's own best epoch 4)
+     phone_score            val 0.3979 train 0.2028 (head's own best epoch 7)
+     phone_mispron_t1.0     val 0.7164 train 0.8764 (head's own best epoch 11)
+finished: 1 fitted
+== failures:

@@ -1,0 +1,111 @@
+results/splits_s8/so762_cv_s8_fold0.csv
+results/splits_s8/so762_cv_s8_fold1.csv
+results/splits_s8/so762_cv_s8_fold2.csv
+results/splits_s8/so762_cv_s8_fold3.csv
+results/splits_s8/so762_cv_s8_fold4.csv
+=== f0 fold 0
+     sent_prosodic          val 0.9428 train 0.5702 (head's own best epoch 10)
+     sent_total             val 1.0372 train 0.4638 (head's own best epoch 7)
+     word_accuracy          val 2.3000 train 0.5005 (head's own best epoch 3)
+     phone_score            val 0.4725 train 0.1610 (head's own best epoch 3)
+     phone_mispron_t1.0     val 0.7057 train 0.9245 (head's own best epoch 7)
+finished: 1 fitted
+=== f0 fold 1
+     sent_prosodic          val 0.8577 train 0.6523 (head's own best epoch 10)
+     sent_total             val 0.9983 train 0.6742 (head's own best epoch 10)
+     word_accuracy          val 1.9854 train 0.7236 (head's own best epoch 3)
+     phone_score            val 0.4107 train 0.1966 (head's own best epoch 3)
+     phone_mispron_t1.0     val 0.6977 train 0.8411 (head's own best epoch 4)
+finished: 1 fitted
+=== f0 fold 2
+     sent_prosodic          val 0.8968 train 0.6474 (head's own best epoch 9)
+     sent_total             val 1.0768 train 0.5775 (head's own best epoch 8)
+     word_accuracy          val 1.8813 train 0.4299 (head's own best epoch 2)
+     phone_score            val 0.3763 train 0.1470 (head's own best epoch 8)
+     phone_mispron_t1.0     val 0.7016 train 0.9348 (head's own best epoch 7)
+finished: 1 fitted
+=== f0 fold 3
+     sent_prosodic          val 0.8341 train 0.5967 (head's own best epoch 7)
+     sent_total             val 1.2168 train 0.5810 (head's own best epoch 9)
+     word_accuracy          val 2.1826 train 0.5558 (head's own best epoch 3)
+     phone_score            val 0.4462 train 0.1656 (head's own best epoch 10)
+     phone_mispron_t1.0     val 0.7069 train 0.8853 (head's own best epoch 4)
+finished: 1 fitted
+=== f0 fold 4
+     sent_prosodic          val 0.7812 train 0.6137 (head's own best epoch 6)
+     sent_total             val 1.0848 train 0.6916 (head's own best epoch 5)
+     word_accuracy          val 1.8516 train 0.7065 (head's own best epoch 4)
+     phone_score            val 0.3930 train 0.1953 (head's own best epoch 7)
+     phone_mispron_t1.0     val 0.7248 train 0.8827 (head's own best epoch 7)
+finished: 1 fitted
+=== f1_s05 fold 0
+     sent_prosodic          val 0.9808 train 0.6437 (head's own best epoch 4)
+     sent_total             val 1.0264 train 0.6470 (head's own best epoch 2)
+     word_accuracy          val 2.2624 train 1.0840 (head's own best epoch 2)
+     phone_score            val 0.4652 train 0.2307 (head's own best epoch 6)
+     phone_mispron_t1.0     val 0.6889 train 0.7756 (head's own best epoch 6)
+finished: 1 fitted
+=== f1_s05 fold 1
+     sent_prosodic          val 0.8318 train 0.6557 (head's own best epoch 10)
+     sent_total             val 1.0067 train 0.6681 (head's own best epoch 10)
+     word_accuracy          val 1.9980 train 0.7345 (head's own best epoch 3)
+     phone_score            val 0.4131 train 0.1979 (head's own best epoch 3)
+     phone_mispron_t1.0     val 0.6953 train 0.8300 (head's own best epoch 4)
+finished: 1 fitted
+=== f1_s05 fold 2
+     sent_prosodic          val 0.8926 train 0.6741 (head's own best epoch 9)
+     sent_total             val 1.0351 train 0.6513 (head's own best epoch 13)
+     word_accuracy          val 1.8902 train 0.5722 (head's own best epoch 3)
+     phone_score            val 0.3752 train 0.1634 (head's own best epoch 13)
+     phone_mispron_t1.0     val 0.7087 train 0.9028 (head's own best epoch 9)
+finished: 1 fitted
+=== f1_s05 fold 3
+     sent_prosodic          val 0.8862 train 0.6802 (head's own best epoch 7)
+     sent_total             val 1.1505 train 0.7021 (head's own best epoch 4)
+     word_accuracy          val 2.1070 train 0.9633 (head's own best epoch 4)
+     phone_score            val 0.4364 train 0.2177 (head's own best epoch 4)
+     phone_mispron_t1.0     val 0.7083 train 0.7612 (head's own best epoch 4)
+finished: 1 fitted
+=== f1_s05 fold 4
+     sent_prosodic          val 0.7339 train 0.5705 (head's own best epoch 9)
+     sent_total             val 1.5663 train 1.2835 (head's own best epoch 13)
+     word_accuracy          val 1.8679 train 0.6972 (head's own best epoch 3)
+     phone_score            val 0.3980 train 0.1933 (head's own best epoch 6)
+     phone_mispron_t1.0     val 0.7129 train 0.8683 (head's own best epoch 7)
+finished: 1 fitted
+=== f1_s10 fold 0
+     sent_prosodic          val 0.9840 train 0.6698 (head's own best epoch 1)
+     sent_total             val 1.0144 train 0.6783 (head's own best epoch 4)
+     word_accuracy          val 2.2833 train 1.1080 (head's own best epoch 3)
+     phone_score            val 0.4664 train 0.2365 (head's own best epoch 4)
+     phone_mispron_t1.0     val 0.6857 train 0.7683 (head's own best epoch 7)
+finished: 1 fitted
+=== f1_s10 fold 1
+     sent_prosodic          val 0.8220 train 0.6359 (head's own best epoch 6)
+     sent_total             val 1.0342 train 0.7110 (head's own best epoch 10)
+     word_accuracy          val 1.9951 train 0.7640 (head's own best epoch 3)
+     phone_score            val 0.4087 train 0.2023 (head's own best epoch 6)
+     phone_mispron_t1.0     val 0.7081 train 0.8173 (head's own best epoch 6)
+finished: 1 fitted
+=== f1_s10 fold 2
+     sent_prosodic          val 0.8993 train 0.6389 (head's own best epoch 12)
+     sent_total             val 1.0506 train 0.6617 (head's own best epoch 13)
+     word_accuracy          val 1.8724 train 0.4604 (head's own best epoch 3)
+     phone_score            val 0.3727 train 0.1449 (head's own best epoch 7)
+     phone_mispron_t1.0     val 0.6940 train 0.9425 (head's own best epoch 5)
+finished: 1 fitted
+=== f1_s10 fold 3
+     sent_prosodic          val 0.8901 train 0.7123 (head's own best epoch 7)
+     sent_total             val 1.1600 train 0.7808 (head's own best epoch 4)
+     word_accuracy          val 2.1579 train 0.9944 (head's own best epoch 4)
+     phone_score            val 0.4429 train 0.2224 (head's own best epoch 4)
+     phone_mispron_t1.0     val 0.6950 train 0.7678 (head's own best epoch 4)
+finished: 1 fitted
+=== f1_s10 fold 4
+     sent_prosodic          val 0.7491 train 0.5828 (head's own best epoch 9)
+     sent_total             val 1.5721 train 1.2842 (head's own best epoch 13)
+     word_accuracy          val 1.8657 train 0.6820 (head's own best epoch 3)
+     phone_score            val 0.4016 train 0.1908 (head's own best epoch 9)
+     phone_mispron_t1.0     val 0.6982 train 0.8855 (head's own best epoch 9)
+finished: 1 fitted
+== failures:
