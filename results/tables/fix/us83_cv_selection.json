@@ -1,0 +1,6 @@
+{
+  "winner": null,
+  "evaluate": "f2_a",
+  "tied": [],
+  "reason": "no candidate qualifies; the single best (eligible if any, else overall) is still evaluated once on test and reported as inconclusive or negative"
+}

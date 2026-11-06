@@ -1,0 +1,6 @@
+candidate  child_delta  child_lo  child_hi  adult_delta non_target_worse  eligible  beats_control  qualifies
+   f1_s05       -0.003    -0.022     0.015        0.006       sent_total     False          False      False
+   f1_s10        0.015    -0.004     0.040        0.006       sent_total     False          False      False
+     f2_a       -0.000    -0.023     0.024       -0.004                       True          False      False
+     f2_b        0.009    -0.015     0.036       -0.002       sent_total     False          False      False
+{'winner': None, 'evaluate': 'f2_a', 'tied': [], 'reason': 'no candidate qualifies; the single best (eligible if any, else overall) is still evaluated once on test and reported as inconclusive or negative'}
