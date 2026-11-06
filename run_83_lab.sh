@@ -54,7 +54,7 @@ case "${1:-}" in
   test)
     python -m pytest tests/test_fix_s8.py tests/test_report_us83.py tests/test_multitask.py tests/test_us63.py -q ;;
   aug)
-    shift; python experiments/scripts/precompute_aug_s8.py "$@" ;;
+    shift; python experiments/scripts/precompute_aug_s8.py --cores 7 "$@" ;;
   smoke)
     split_files
     fit s8smoke_f0 s8_f0 0 --epochs 2 --force

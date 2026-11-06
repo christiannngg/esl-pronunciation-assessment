@@ -687,6 +687,8 @@ def run_group(group: str, md: MTData, enc_cache: dict, cfg: dict, tag: str, fold
             bad += 1
             if bad >= int(tcfg["patience"]) and step > freeze:
                 break
+    if bank is not None:
+        log(f"    F2 bank {bank.dir.name}: {bank.used} augmented utterances swapped in during training")
     model.load_state_dict(best_state)
     model.train_encoder = True
 
