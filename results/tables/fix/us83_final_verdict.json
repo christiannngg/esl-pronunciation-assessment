@@ -1,0 +1,12 @@
+{
+  "rule_i_child_target_improves_and_none_worse": false,
+  "rule_ii_no_head_significantly_worse_overall": false,
+  "worse_heads": [
+    "sent_prosodic",
+    "phone_mispron_t1.0"
+  ],
+  "rule_iii_adult_target_not_worse": false,
+  "accepted": false,
+  "candidate": "f2_a",
+  "cv_winner": null
+}

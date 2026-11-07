@@ -47,3 +47,6 @@ L2-ARCTIC (exploratory, descriptive): B->F and F->FT-stab both improve phone err
 - Holm-significant evidence for mechanism (b) is not available (p=0.12); the child F1 drop CI excludes zero but the gap change does not survive Family B correction. Present as suggestive.
 - Check 2 covers FT-base, FT-stab, MT-full, MT-GN15 only (B and F have no probability export). Calibration conclusions use a pooled operating point chosen on all test speakers.
 - One seed per system in these bundles for the ablation contrasts.
+
+## 6. Update after US 8.3 (2026-11-07)
+The calibration reading above did not survive a direct test. Per-age-group decision thresholds, fit on out-of-fold probabilities, do not reduce the macro-F1 gap of the target head (gap 0.124 -> 0.132), and the child/teen thresholds are unstable across folds. The calibration part of the recall gap is a statement about recall at a given false-positive rate; at the F1-optimal operating point the child/teen deficit comes mainly from rarer positives and weaker ranking. The group-aware reweighting and the child-like augmentation of US 8.3 did not help either. See `docs/us83_fix.md`.
